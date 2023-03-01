@@ -19,7 +19,7 @@
 / {
 	/* MGBE - A */
 	ethernet@6810000 {
-		status = "okay";
+		status = "disabled";
 		nvidia,mac-addr-idx = <0>;
 		nvidia,max-platform-mtu = <16383>;
 		/* 0=enable, 1=disable */

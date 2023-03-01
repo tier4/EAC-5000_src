@@ -1188,26 +1188,29 @@ static int __pci_enable_msix_range(struct pci_dev *dev,
 
 	if (maxvec < minvec)
 		return -ERANGE;
+	//printk(KERN_INFO "pci_enable_msix_range phase1.\n");
 
 	if (WARN_ON_ONCE(dev->msix_enabled))
 		return -EINVAL;
-
+	//printk(KERN_INFO "pci_enable_msix_range phase2.\n");
 	for (;;) {
 		if (affd) {
 			nvec = irq_calc_affinity_vectors(minvec, nvec, affd);
+			//printk(KERN_INFO "pci_enable_msix_range phase1.5.\n");
 			if (nvec < minvec)
 				return -ENOSPC;
 		}
-
+		//printk(KERN_INFO "pci_enable_msix_range phase3.\n");
 		rc = __pci_enable_msix(dev, entries, nvec, affd, flags);
 		if (rc == 0)
 			return nvec;
-
+		//printk(KERN_INFO "pci_enable_msix_range phase4.\n");
 		if (rc < 0)
 			return rc;
+		//printk(KERN_INFO "pci_enable_msix_range phase5.\n");	
 		if (rc < minvec)
 			return -ENOSPC;
-
+		//printk(KERN_INFO "pci_enable_msix_range phase6.\n");
 		nvec = rc;
 	}
 }

@@ -1,0 +1,157 @@
+// FIX: t19x-common-modules/tegra194-camera-imx390-a00.dtsi
+//			imx390_a@1b {
+				compatible = "sony,imx390","nvidia,imx390isp";
+
+				def-addr = <0x6d>;	// FIX:+
+				//reg = <0x1b>;	// FIX:-
+
+				/* Physical dimensions of sensor */
+				physical_w = "15.0";
+				physical_h = "12.5";
+
+				sensor_model ="imx390isp";
+
+				/* Defines number of frames to be dropped by driver internally after applying */
+				/* sensor crop settings. Some sensors send corrupt frames after applying */
+				/* crop co-ordinates */
+				post_crop_frame_drop = "0";
+
+				/* Convert Gain to unit of dB (decibel) befor passing to kernel driver */
+				//use_decibel_gain = "true";	// FIX:?
+
+				/* enable CID_SENSOR_MODE_ID for sensor modes selection */
+				use_sensor_mode_id = "true";
+
+				/**
+				* A modeX node is required to support v4l2 driver
+				* implementation with NVIDIA camera software stack
+				*
+				* mclk_khz = "";
+				* Standard MIPI driving clock, typically 24MHz
+				*
+				* num_lanes = "";
+				* Number of lane channels sensor is programmed to output
+				*
+				* tegra_sinterface = "";
+				* The base tegra serial interface lanes are connected to
+				*
+				* vc_id = "";
+				* The virtual channel id of the sensor.
+				*
+				* discontinuous_clk = "";
+				* The sensor is programmed to use a discontinuous clock on MIPI lanes
+				*
+				* dpcm_enable = "true";
+				* The sensor is programmed to use a DPCM modes
+				*
+				* cil_settletime = "";
+				* MIPI lane settle time value.
+				* A "0" value attempts to autocalibrate based on mclk_khz and pix_clk_hz
+				*
+				* active_w = "";
+				* Pixel active region width
+				*
+				* active_h = "";
+				* Pixel active region height
+				*
+				* dynamic_pixel_bit_depth = "";
+				* sensor dynamic bit depth for sensor mode
+				*
+				* csi_pixel_bit_depth = "";
+				* sensor output bit depth for sensor mode
+				*
+				* mode_type="";
+				* Sensor mode type, For eg: yuv, Rgb, bayer, bayer_wdr_pwl
+				*
+				* pixel_phase="";
+				* Pixel phase for sensor mode, For eg: rggb, vyuy, rgb888
+				*
+				* readout_orientation = "0";
+				* Based on camera module orientation.
+				* Only change readout_orientation if you specifically
+				* Program a different readout order for this mode
+				*
+				* line_length = "";
+				* Pixel line length (width) for sensor mode.
+				* This is used to calibrate features in our camera stack.
+				*
+				* pix_clk_hz = "";
+				* Sensor pixel clock used for calculations like exposure and framerate
+				*
+				*
+				*
+				*
+				* inherent_gain = "";
+				* Gain obtained inherently from mode (ie. pixel binning)
+				*
+				* min_gain_val = ""; (floor to 6 decimal places)
+				* max_gain_val = ""; (floor to 6 decimal places)
+				* Gain limits for mode
+				* if use_decibel_gain = "true", please set the gain as decibel
+				*
+				* min_exp_time = ""; (ceil to integer)
+				* max_exp_time = ""; (ceil to integer)
+				* Exposure Time limits for mode (us)
+				*
+				*
+				* min_hdr_ratio = "";
+				* max_hdr_ratio = "";
+				* HDR Ratio limits for mode
+				*
+				* min_framerate = "";
+				* max_framerate = "";
+				* Framerate limits for mode (fps)
+				*
+				* embedded_metadata_height = "";
+				* Sensor embedded metadata height in units of rows.
+				* If sensor does not support embedded metadata value should be 0.
+				*/
+
+				mode0 {/*mode IMX390_MODE_1920X1080_CROP_30FPS*/
+					
+
+					
+					tegra_sinterface = "serial_a";	// FIX:*
+					vc_id = "0";	// FIX:*
+					
+					mclk_khz = "24000";
+					num_lanes = "4";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					//dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1080";
+					readout_orientation = "0";
+					line_length = "2200";
+					inherent_gain = "1";
+					pix_clk_hz = "187000000";	// FIX:* 74250000
+					//serdes_pix_clk_hz = "200000000";	// FIX:-
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "59"; /*us, 2 lines*/
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333";/* us */
+					embedded_metadata_height = "0";
+				};
+				gmsl-link {
+					streams = "yuv8","ued-u1";	// FIX:*
+				};
+//			};

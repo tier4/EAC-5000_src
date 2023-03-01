@@ -138,7 +138,7 @@
 		reg = <0x0 0x0c2a0000 0x0 0x00010000>;
 		interrupt-parent = <&tegra_pmc>;
 		interrupts = <73 IRQ_TYPE_LEVEL_HIGH>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	chipid@100000 {

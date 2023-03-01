@@ -17,6 +17,8 @@
 /*
  * tegra234-soc-eqos.dtsi: Ethernet QOS DTSI file.
  */
+#include <t234-common-cvb/tegra234-p3711-ethernet.dtsi>
+#include <t234-common-cvb/tegra234-p3737-eqos-pinmux.dtsi>
 
 / {
 	pinmux@2430000 {
@@ -113,7 +115,8 @@
 		nvidia,tx-queue-prio = <0x0 0x7 0x2 0x3 0x0 0x0 0x0 0x0>;
 		nvidia,rxq_enable_ctrl = <2 2 2 2 2 2 2 2>;
 		nvidia,vm-irq-config = <&eqos_vm_irq_config>;
-		status = "disabled";
+		//status = "disabled";
+		status = "okay";
 		nvidia,dcs-enable = <0x1>;
 		nvidia,pad_calibration = <0x1>;
 		nvidia,rx_riwt = <512>;

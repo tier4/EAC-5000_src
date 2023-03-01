@@ -60,6 +60,7 @@
 #define RTLGEN_SPEED_MASK			0x0630
 
 #define RTL_GENERIC_PHYID			0x001cc800
+#define RTL_8211FVD_PHYID			0x001cc878
 
 #define RTL8211F_LED_PAGE			0xd04
 
@@ -265,7 +266,7 @@ static int rtl8211c_config_init(struct phy_device *phydev)
 static int rtl8211f_config_init(struct phy_device *phydev)
 {
 	struct device *dev = &phydev->mdio.dev;
-	u16 val_txdly, val_rxdly;
+	u16 val_txdly, val_rxdly , oldpage;
 	u16 val;
 	int ret;
 
@@ -335,19 +336,33 @@ static int rtl8211f_config_init(struct phy_device *phydev)
 		RTL8211F_LED1_LINK_100 | RTL8211F_LED1_LINK_10 |
 		RTL8211F_LED1_LINK_ACTIVE;
 
-	ret = phy_modify_paged_changed(phydev, RTL8211F_LED_PAGE, RTL8211F_PAGE_LCR_LED_CONTROL, val,
-				       val);
+	oldpage = phy_select_page(phydev, RTL8211F_LED_PAGE);
+	if (oldpage < 0)
+		dev_dbg(dev, "select page failed\n");
+	printk(KERN_INFO "RTL8211 SET LED!!");
+	ret = __phy_write(phydev, RTL8211F_PAGE_EEE_LED_CONTROL, 0x0000);
+	if (ret < 0)
+		dev_dbg(dev, "write EEE register failed\n");
+	ret = __phy_write(phydev, RTL8211F_PAGE_LCR_LED_CONTROL, 0x091b);
+	if (ret < 0)
+		dev_dbg(dev, "write LED register failed\n");	
+	phy_restore_page(phydev, oldpage, ret);
+	/*
+	ret = phy_modify_paged_changed(phydev, RTL8211F_LED_PAGE, RTL8211F_PAGE_LCR_LED_CONTROL, 0x091b,
+				       0x091b);
 	if (ret < 0) {
 		dev_err(dev, "Failed to LED registers\n");
 		return ret;
 	}
+	*/
 	/* disable EEE LED control */
+	/*
 	ret = phy_modify_paged_changed(phydev, RTL8211F_LED_PAGE, RTL8211F_PAGE_EEE_LED_CONTROL, 0, 0);
 	if (ret < 0) {
 		dev_err(dev, "Failed to EEE LED registers\n");
 		return ret;
 	}
-
+	*/
 	/* Advertise Flow Control */
 	linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydev->supported);
 	linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, phydev->supported);

@@ -1,0 +1,67 @@
+diff --git a/drivers/char/tpm/tpm_tis_core.c b/drivers/char/tpm/tpm_tis_core.c
+index dc56b976d816..757623bacfd5 100644
+--- a/drivers/char/tpm/tpm_tis_core.c
++++ b/drivers/char/tpm/tpm_tis_core.c
+@@ -289,6 +289,7 @@ static int tpm_tis_recv(struct tpm_chip *chip, u8 *buf, size_t count)
+ 	int size = 0;
+ 	int status;
+ 	u32 expected;
++	int rc;
+ 
+ 	if (count < TPM_HEADER_SIZE) {
+ 		size = -EIO;
+@@ -328,6 +329,13 @@ static int tpm_tis_recv(struct tpm_chip *chip, u8 *buf, size_t count)
+ 		goto out;
+ 	}
+ 
++	rc = tpm_tis_verify_crc(priv, (size_t)size, buf);
++	if (rc < 0) {
++		dev_err(&chip->dev, "CRC mismatch for response.\n");
++		size = rc;
++		goto out;
++	}
++
+ out:
+ 	tpm_tis_ready(chip);
+ 	return size;
+@@ -443,6 +451,12 @@ static int tpm_tis_send_main(struct tpm_chip *chip, const u8 *buf, size_t len)
+ 	if (rc < 0)
+ 		return rc;
+ 
++	rc = tpm_tis_verify_crc(priv, len, buf);
++	if (rc < 0) {
++		dev_err(&chip->dev, "CRC mismatch for command.\n");
++		return rc;
++	}
++
+ 	/* go and do it */
+ 	rc = tpm_tis_write8(priv, TPM_STS(priv->locality), TPM_STS_GO);
+ 	if (rc < 0)
+diff --git a/drivers/char/tpm/tpm_tis_core.h b/drivers/char/tpm/tpm_tis_core.h
+index 6c203f36b8a1..66a5a13cd1df 100644
+--- a/drivers/char/tpm/tpm_tis_core.h
++++ b/drivers/char/tpm/tpm_tis_core.h
+@@ -121,6 +121,8 @@ struct tpm_tis_phy_ops {
+ 			  u8 *result, enum tpm_tis_io_mode mode);
+ 	int (*write_bytes)(struct tpm_tis_data *data, u32 addr, u16 len,
+ 			   const u8 *value, enum tpm_tis_io_mode mode);
++	int (*verify_crc)(struct tpm_tis_data *data, size_t len,
++			  const u8 *value);
+ };
+ 
+ static inline int tpm_tis_read_bytes(struct tpm_tis_data *data, u32 addr,
+@@ -188,6 +190,14 @@ static inline int tpm_tis_write32(struct tpm_tis_data *data, u32 addr,
+ 	return rc;
+ }
+ 
++static inline int tpm_tis_verify_crc(struct tpm_tis_data *data, size_t len,
++				     const u8 *value)
++{
++	if (!data->phy_ops->verify_crc)
++		return 0;
++	return data->phy_ops->verify_crc(data, len, value);
++}
++
+ static inline bool is_bsw(void)
+ {
+ #ifdef CONFIG_X86

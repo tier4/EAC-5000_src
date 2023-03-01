@@ -2365,6 +2365,8 @@ static void tegra_pcie_prepare_host(struct pcie_port *pp)
 			dev_err(pci->dev,
 				"Failed to enable monitor core clock\n");
 
+
+	printk(KERN_INFO ": Leo_debug: clk_prepare_enable\n ");
 	/* Assert RST */
 	val = appl_readl(pcie, APPL_PINMUX);
 	val &= ~APPL_PINMUX_PEX_RST;
@@ -2383,6 +2385,7 @@ static void tegra_pcie_prepare_host(struct pcie_port *pp)
 	appl_writel(pcie, val, APPL_PINMUX);
 
 	msleep(100);
+	printk(KERN_INFO ": Leo_debug: De-assert RST\n ");
 }
 
 static int tegra_pcie_dw_host_init(struct pcie_port *pp)

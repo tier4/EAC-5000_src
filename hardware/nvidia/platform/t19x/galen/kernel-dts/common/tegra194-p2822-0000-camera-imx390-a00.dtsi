@@ -21,7 +21,7 @@
 
 /* camera control gpio definitions */
 
-/ {
+/ {s
 	i2c@3180000 {
 		tca9546@70 {
 			compatible = "nxp,pca9546";
