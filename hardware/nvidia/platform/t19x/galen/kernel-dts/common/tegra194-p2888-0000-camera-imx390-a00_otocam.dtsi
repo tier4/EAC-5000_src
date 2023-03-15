@@ -33,7 +33,7 @@
 			vcc-supply = <&p2822_vdd_1v8_cvb>;
 			vcc-pullup-supply = <&battery_reg>;
 			force_bus_start = <CAMERA_I2C_MUX_BUS(0)>;
-
+			i2c-mux-idle-disconnect;
 			i2c@0 {
 				reg = <0>;
 				i2c-mux,deselect-on-exit;
@@ -151,6 +151,7 @@
 			vcc-supply = <&p2822_vdd_1v8_cvb>;
 			vcc-pullup-supply = <&battery_reg>;
 			force_bus_start = <CAMERA_I2C_MUX_BUS(2)>;
+			i2c-mux-idle-disconnect;
 			i2c@0 {
 				reg = <0>;
 				i2c-mux,deselect-on-exit;

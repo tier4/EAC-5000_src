@@ -16,7 +16,11 @@
 #include <t234-common-modules/tegra234-camera-imx390-a00_otocam.dtsi>
 #include "dt-bindings/clock/tegra234-clock.h"
 
-#define CAM0_RST_L	TEGRA234_MAIN_GPIO(H, 3)
+
+#define CAM0_PWDN	TEGRA234_MAIN_GPIO(H, 6)
+#define CAM1_PWDN	TEGRA234_MAIN_GPIO(AC, 0)
+#define CAM2_PWDN	TEGRA234_MAIN_GPIO(H, 3)
+#define CAM3_PWDN	TEGRA234_MAIN_GPIO(AC, 1)
 #define CAMERA_I2C_MUX_BUS(x) (0x1E + x)
 
 /* camera control gpio definitions */
@@ -33,12 +37,13 @@
 			vcc-supply = <&p3737_vdd_1v8_sys>;
 			vcc-pullup-supply = <&battery_reg>;
 			force_bus_start = <CAMERA_I2C_MUX_BUS(0)>;
-
+			i2c-mux-idle-disconnect;
 			i2c@0 {
 				reg = <0>;
 				i2c-mux,deselect-on-exit;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				i2c-mux-idle-disconnect;
 				dser: max9296@48 {
 					compatible = "maxim,max9296";
 					streams = "yuv8";
@@ -46,7 +51,7 @@
 					csi-mode = "2x4";
 					max-src = <2>;
 					fsync-gpio = <6>; //fsync gpio on 9296
-					//reset-gpios = <&tegra_main_gpio CAM0_RST_L GPIO_ACTIVE_HIGH>;
+					reset-gpios = <&tegra_main_gpio CAM0_PWDN GPIO_ACTIVE_HIGH>;
 				};
 				ser_prim: max9295_prim@62 {
 					compatible = "maxim,max9295";
@@ -63,9 +68,9 @@
 					reg = <0x60>;
 					nvidia,gmsl-dser-device = <&dser>;
 				};
-				cam_0: imx390@10 {
-					reg = <0x10>;
-					reg_mux = <0>;	
+				imx390isp_a@1b {
+					reg = <0x1b>;
+					
 					/* Define any required hw resources needed by driver */
 					/* ie. clocks, io pins, power sources */
 					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
@@ -75,9 +80,9 @@
 					nvidia,gmsl-ser-device = <&ser_a>;
 					nvidia,gmsl-dser-device = <&dser>;
 				};
-				cam_1: imx390@11 {
-					reg = <0x11>;
-					reg_mux = <1>;	
+				imx390isp_b@1c {
+					reg = <0x1c>;
+					
 					/* Define any required hw resources needed by driver */
 					/* ie. clocks, io pins, power sources */
 					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
@@ -93,13 +98,14 @@
 				i2c-mux,deselect-on-exit;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				i2c-mux-idle-disconnect;
 				dsera: max9296@48 {
 					compatible = "maxim,max9296";
 					//streams = "yuv8";
 					reg = <0x48>;
 					csi-mode = "2x4";
 					max-src = <2>;
-					//reset-gpios = <&tegra_main_gpio CAM1_PWDN GPIO_ACTIVE_HIGH>;
+					reset-gpios = <&tegra_main_gpio CAM1_PWDN GPIO_ACTIVE_HIGH>;
                                         fsync-gpio = <6>; //fsync gpio on 9296
 				};
 				ser_prima: max9295_prim@62 {
@@ -118,9 +124,9 @@
 					reg = <0x60>;
 					nvidia,gmsl-dser-device = <&dsera>;
 				};
-				cam_2: imx390@12 {
-					reg = <0x12>;
-					reg_mux = <2>;	
+				imx390isp_c@1b{
+					reg = <0x1b>;
+						
 					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
 							<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
 					clock-names = "extperiph1", "pllp_grtba";
@@ -128,9 +134,9 @@
 					nvidia,gmsl-ser-device = <&ser_c>;
 					nvidia,gmsl-dser-device = <&dsera>;
 				};
-				cam_3: imx390@13 {
-					reg = <0x13>;
-					reg_mux = <3>;	
+				imx390isp_d@1c {
+					reg = <0x1c>;
+						
 					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
 							<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
 					clock-names = "extperiph1", "pllp_grtba";
@@ -151,18 +157,20 @@
 			vcc-supply = <&p3737_vdd_1v8_sys>;
 			vcc-pullup-supply = <&battery_reg>;
 			force_bus_start = <CAMERA_I2C_MUX_BUS(2)>;
+			i2c-mux-idle-disconnect;
 			i2c@0 {
 				reg = <0>;
 				i2c-mux,deselect-on-exit;
 				address-cells = <1>;
 				#size-cells = <0>;
+				i2c-mux-idle-disconnect;
 				dserb: max9296@48 {
 					compatible = "maxim,max9296";
 					//streams = "yuv8";
 					reg = <0x48>;
 					csi-mode = "2x4";
 					max-src = <2>;
-					//reset-gpios = <&tegra_main_gpio CAM2_PWDN GPIO_ACTIVE_HIGH>;
+					reset-gpios = <&tegra_main_gpio CAM2_PWDN GPIO_ACTIVE_HIGH>;
                                         fsync-gpio = <6>; //fsync gpio on 9296
 				};
 				ser_primb: max9295_prim@62 {
@@ -181,9 +189,9 @@
 					reg = <0x60>;
 					nvidia,gmsl-dser-device = <&dserb>;
 				};
-				cam_4: imx390@14 {
-					reg = <0x14>;
-					reg_mux = <4>;	
+				imx390isp_e@1b {
+					reg = <0x1b>;
+					
 					/* Define any required hw resources needed by driver */
 					/* ie. clocks, io pins, power sources */
 					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
@@ -193,9 +201,9 @@
 					nvidia,gmsl-ser-device = <&ser_e>;
 					nvidia,gmsl-dser-device = <&dserb>;
 				};
-				cam_5: imx390@15 {
-					reg = <0x15>;
-					reg_mux = <5>;	
+				imx390isp_f@1c {
+					reg = <0x1c>;
+					
 					/* Define any required hw resources needed by driver */
 					/* ie. clocks, io pins, power sources */
 					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
@@ -211,13 +219,14 @@
 				i2c-mux,deselect-on-exit;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				i2c-mux-idle-disconnect;
 				dserc: max9296@48 {
 					compatible = "maxim,max9296";
 					//streams = "yuv8";
 					reg = <0x48>;
 					csi-mode = "2x4";
 					max-src = <2>;
-					//reset-gpios = <&tegra_main_gpio CAM3_PWDN GPIO_ACTIVE_HIGH>;
+					reset-gpios = <&tegra_main_gpio CAM3_PWDN GPIO_ACTIVE_HIGH>;
                                         fsync-gpio = <6>; //fsync gpio on 9296
 				};
 				ser_primc: max9295_prim@62 {
@@ -236,9 +245,9 @@
 					reg = <0x60>;
 					nvidia,gmsl-dser-device = <&dserc>;
 				};
-				cam_6: imx390@16 {
-					reg = <0x16>;
-					reg_mux = <6>;	
+				imx390isp_g@1b {
+					reg = <0x1b>;
+					
 					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
 							<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
 					clock-names = "extperiph1", "pllp_grtba";
@@ -246,9 +255,9 @@
 					nvidia,gmsl-ser-device = <&ser_g>;
 					nvidia,gmsl-dser-device = <&dserc>;
 				};
-				cam_7: imx390@17 {
-					reg = <0x17>;
-					reg_mux = <7>;	
+				imx390isp_h@1c {
+					reg = <0x1c>;
+					
 					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
 							<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
 					clock-names = "extperiph1", "pllp_grtba";

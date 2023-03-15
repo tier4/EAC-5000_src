@@ -274,7 +274,7 @@
 i2c@3180000 {
 		tca9543@72 {
 		i2c@0 {
-		cam_0: imx390@10 {
+		imx390isp_a@1b {
 				compatible = "sony,imx390","nvidia,imx390isp";
 
 				def-addr = <0x6d>;	
@@ -364,7 +364,7 @@ i2c@3180000 {
 			};
 
 
-			cam_1: imx390@11{
+			imx390isp_b@1c{
 				compatible = "sony,imx390","nvidia,imx390isp";
 
 				def-addr = <0x6d>;	// FIX:+
@@ -454,7 +454,7 @@ i2c@3180000 {
 			};
 
 		     i2c@1 {
-			cam_2: imx390@12 {
+			imx390isp_c@1b {
 				compatible = "sony,imx390","nvidia,imx390isp";
 
 				def-addr = <0x6d>;	// FIX:+
@@ -542,7 +542,7 @@ i2c@3180000 {
 				};
 			};
 
-			cam_3: imx390@13 {
+			imx390isp_d@1c {
 				compatible = "sony,imx390","nvidia,imx390isp";
 
 				def-addr = <0x6d>;	// FIX:+
@@ -634,7 +634,7 @@ i2c@3180000 {
 			
 			tca9543@73{
 			i2c@0 {
-			cam_4: imx390@14 {
+			imx390isp_e@1b {
 				compatible = "sony,imx390","nvidia,imx390isp";
 
 				def-addr = <0x6d>;	// FIX:+
@@ -723,7 +723,7 @@ i2c@3180000 {
 				};
 			};
 			
-			cam_5: imx390@15 {
+			imx390isp_f@1c {
 				compatible = "sony,imx390","nvidia,imx390isp";
 
 				def-addr = <0x6d>;	// FIX:+
@@ -812,7 +812,7 @@ i2c@3180000 {
 			};
 			
 			i2c@1 {
-			cam_6: imx390@16 {
+			imx390isp_g@1b {
 				compatible = "sony,imx390","nvidia,imx390isp";
 
 				def-addr = <0x6d>;	// FIX:+
@@ -899,7 +899,7 @@ i2c@3180000 {
 				};
 			};
 			
-			cam_7: imx390@17 {
+			imx390isp_h@1c {
 				compatible = "sony,imx390","nvidia,imx390isp";
 
 				def-addr = <0x6d>;	// FIX:+
@@ -1053,9 +1053,9 @@ i2c@3180000 {
 					/* Declare PCL support driver (classically known as guid)  */
 					pcl_id = "v4l2_sensor";
 					/* Driver v4l2 device name */
-					devname = "imx390 30-001b";
+					devname = "imx390isp 30-001b";
 					/* Declare the device-tree hierarchy to driver instance */
-					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@0/imx390@10";
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@0/imx390isp_a@1b";
 				};
 			};
 			module1 {
@@ -1066,9 +1066,9 @@ i2c@3180000 {
 					/* Declare PCL support driver (classically known as guid)  */
 					pcl_id = "v4l2_sensor";
 					/* Driver v4l2 device name */
-					devname = "imx390 30-001c";
+					devname = "imx390isp 30-001c";
 					/* Declare the device-tree hierarchy to driver instance */
-					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@0/imx390@11";
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@0/imx390isp_b@1c";
 				};
 			};
 			module2 {
@@ -1079,9 +1079,9 @@ i2c@3180000 {
 					/* Declare PCL support driver (classically known as guid)  */
 					pcl_id = "v4l2_sensor";
 					/* Driver v4l2 device name */
-					devname = "imx390 31-001b";
+					devname = "imx390isp 31-001b";
 					/* Declare the device-tree hierarchy to driver instance */
-					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@1/imx390@12";
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@1/imx390isp_c@1b";
 				};
 			};
 			module3 {
@@ -1092,9 +1092,9 @@ i2c@3180000 {
 					/* Declare PCL support driver (classically known as guid)  */
 					pcl_id = "v4l2_sensor";
 					/* Driver v4l2 device name */
-					devname = "imx390 31-001c";
+					devname = "imx390isp 31-001c";
 					/* Declare the device-tree hierarchy to driver instance */
-					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@1/imx390@13";
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@1/imx390isp_d@1c";
 				};
 			};
 			module4 {
@@ -1105,9 +1105,9 @@ i2c@3180000 {
 					/* Declare PCL support driver (classically known as guid)  */
 					pcl_id = "v4l2_sensor";
 					/* Driver v4l2 device name */
-					devname = "imx390 32-001b";
+					devname = "imx390isp 32-001b";
 					/* Declare the device-tree hierarchy to driver instance */
-					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@0/imx390@14";
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@0/imx390isp_e@1b";
 				};
 			};
 			module5 {
@@ -1118,9 +1118,9 @@ i2c@3180000 {
 					/* Declare PCL support driver (classically known as guid)  */
 					pcl_id = "v4l2_sensor";
 					/* Driver v4l2 device name */
-					devname = "imx390 32-001c";
+					devname = "imx390isp 32-001c";
 					/* Declare the device-tree hierarchy to driver instance */
-					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@0/imx390@15";
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@0/imx390isp_f@1c";
 				};
 			};
 			module6 {
@@ -1131,9 +1131,9 @@ i2c@3180000 {
 					/* Declare PCL support driver (classically known as guid)  */
 					pcl_id = "v4l2_sensor";
 					/* Driver v4l2 device name */
-					devname = "imx390 33-001b";
+					devname = "imx390isp 33-001b";
 					/* Declare the device-tree hierarchy to driver instance */
-					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@1/imx390@16";
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@1/imx390isp_g@1b";
 				};
 			};
 			module7 {
@@ -1144,9 +1144,9 @@ i2c@3180000 {
 					/* Declare PCL support driver (classically known as guid)  */
 					pcl_id = "v4l2_sensor";
 					/* Driver v4l2 device name */
-					devname = "imx390 33-001c";
+					devname = "imx390isp 33-001c";
 					/* Declare the device-tree hierarchy to driver instance */
-					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@1/imx390@17";
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@1/imx390isp_h@1c";
 				};
 			};
 		};

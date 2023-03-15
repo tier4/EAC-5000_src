@@ -307,7 +307,6 @@ i2c@3180000 {
 					csi_pixel_bit_depth = "16";
 					mode_type = "yuv";
 					pixel_phase = "uyvy";
-					pixel_t = "yuv_uyvy16";//test
 
 					active_w = "1920";
 					active_h = "1080";
@@ -401,7 +400,6 @@ i2c@3180000 {
 					csi_pixel_bit_depth = "16";
 					mode_type = "yuv";
 					pixel_phase = "uyvy";
-					pixel_t = "yuv_uyvy16";//test
 
 					active_w = "1920";
 					active_h = "1080";
