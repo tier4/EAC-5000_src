@@ -243,6 +243,11 @@ static struct capture_mapping *get_mapping(
 	struct dma_buf *buf;
 	void *err;
 
+	if (unlikely(tab == NULL)) {
+		pr_err("%s: invalid buffer table\n", __func__);
+		return ERR_PTR(-EINVAL);
+	}
+
 	buf = dma_buf_get((int)fd);
 	if (IS_ERR(buf)) {
 		dev_err(tab->dev, "%s:%d: invalid memfd %u; errno %ld \n",
@@ -325,6 +330,9 @@ void destroy_buffer_table(
 	struct hlist_node *next;
 	struct capture_mapping *pin;
 
+	if (unlikely(tab == NULL))
+		return;
+
 	write_lock(&tab->hlock);
 
 	hash_for_each_safe(tab->hhead, bkt, next, pin, hnode) {
@@ -354,6 +362,11 @@ int capture_buffer_request(
 	bool add = (bool)(flag & BUFFER_ADD);
 	int err = 0;
 
+	if (unlikely(tab == NULL)) {
+		pr_err("%s: invalid buffer table\n", __func__);
+		return -EINVAL;
+	}
+
 	mutex_lock(&req_lock);
 
 	if (add) {
@@ -361,14 +374,14 @@ int capture_buffer_request(
 		if (IS_ERR(pin)) {
 			err = PTR_ERR_OR_ZERO(pin);
 			dev_err(tab->dev, "%s:%d: memfd %u, flag %u; errno %d",
-				__func__, __LINE__,memfd, flag, err);
+				__func__, __LINE__, memfd, flag, err);
 			goto end;
 		}
 
 		if (mapping_preserved(pin)) {
 			err = -EEXIST;
 			dev_err(tab->dev, "%s:%d: memfd %u exists; errno %d",
-				__func__, __LINE__,memfd, err);
+				__func__, __LINE__, memfd, err);
 			put_mapping(tab, pin);
 			goto end;
 		}
@@ -385,7 +398,7 @@ int capture_buffer_request(
 		if (pin == NULL) {
 			err = -ENOENT;
 			dev_err(tab->dev, "%s:%d: memfd %u not exists; errno %d",
-				__func__, __LINE__,memfd, err);
+				__func__, __LINE__, memfd, err);
 			dma_buf_put(buf);
 			goto end;
 		}

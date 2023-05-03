@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -728,6 +728,7 @@
 
 			head1: display@15210000 {
 				status = "disabled";
+				bootloader-status = "disabled";
 				compatible = "nvidia,tegra194-dc";
 				reg = <0x0 0x15210000 0x0 0x10000>;
 				interrupts = <0 154 4>;
@@ -803,6 +804,7 @@
 
 			head2: display@15220000 {
 				status = "disabled";
+				bootloader-status = "disabled";
 				compatible = "nvidia,tegra194-dc";
 				reg = <0x0 0x15220000 0x0 0x10000>;
 				interrupts = <0 155 4>;
@@ -877,6 +879,7 @@
 
 			head3: display@15230000 {
 				status = "disabled";
+				bootloader-status = "disabled";
 				compatible = "nvidia,tegra194-dc";
 				reg = <0x0 0x15230000 0x0 0x10000>;
 				interrupts = <0 242 4>;
@@ -2111,7 +2114,7 @@
 				<&bpmp_clks TEGRA194_CLK_NAFLL_CVNAS>;
 		clock-names = "emc", "nafll_dla", "nafll_dla_falcon",
 				"nafll_pva_vps", "nafll_pva_core", "nafll_cvnas";
-		status = "okay";
+		status = "disabled";
 	};
 
 	external-connection {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -20,7 +20,7 @@
 
 #include <dt-bindings/gpio/tegra234-gpio.h>
 
-#define JETSON_COMPATIBLE	"nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004"
+#define JETSON_COMPATIBLE	"nvidia,p3737-0000+p3701-0000", "nvidia,p3737-0000+p3701-0004", "nvidia,p3737-0000+p3701-0005"
 
 /* SoC function name for clock signal on 40-pin header pin 7 */
 #define HDR40_CLK	"extperiph4"
@@ -72,7 +72,7 @@
 #define HDR40_PIN29_GPIO	TEGRA_AON_GPIO(AA, 1)
 #define HDR40_PIN31_GPIO	TEGRA_AON_GPIO(AA, 0)
 #define HDR40_PIN32_GPIO	TEGRA_AON_GPIO(BB, 1)
-#define HDR40_PIN33_GPIO	TEGRA_AON_GPIO(AA, 3)
+#define HDR40_PIN33_GPIO	TEGRA_AON_GPIO(AA, 2)
 #define HDR40_PIN35_GPIO	TEGRA_MAIN_GPIO(I, 2)
 #define HDR40_PIN36_GPIO	TEGRA_MAIN_GPIO(R, 5)
 #define HDR40_PIN37_GPIO	TEGRA_AON_GPIO(AA, 3)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -136,7 +136,7 @@ int tegra_dce_register_ipc_client(u32 type,
 {
 	int ret;
 	uint32_t int_type;
-	struct tegra_dce *d;
+	struct tegra_dce *d = NULL;
 	struct tegra_dce_client_ipc *cl;
 	u32 handle = DCE_CLIENT_IPC_HANDLE_INVALID;
 
@@ -157,6 +157,18 @@ int tegra_dce_register_ipc_client(u32 type,
 	d = dce_ipc_get_dce_from_ch(int_type);
 	if (d == NULL) {
 		ret = -EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Wait for bootstrapping to complete before client IPC registration
+	 */
+#define DCE_IPC_REGISTER_BOOT_WAIT	(30U * 1000)
+	ret = DCE_COND_WAIT_INTERRUPTIBLE_TIMEOUT(&d->dce_bootstrap_done,
+						  dce_is_bootstrap_done(d),
+						  DCE_IPC_REGISTER_BOOT_WAIT);
+	if (ret) {
+		dce_info(d, "dce boot wait failed (%d)\n", ret);
 		goto out;
 	}
 
@@ -279,8 +291,7 @@ int dce_client_ipc_wait(struct tegra_dce *d, u32 int_type)
 
 retry_wait:
 	DCE_COND_WAIT_INTERRUPTIBLE(&cl->recv_wait,
-			atomic_read(&cl->complete) == 1,
-			0);
+			atomic_read(&cl->complete) == 1);
 	if (atomic_read(&cl->complete) != 1)
 		goto retry_wait;
 
@@ -313,7 +324,7 @@ static void dce_client_process_event_ipc(struct tegra_dce *d,
 	}
 	msg_length = DCE_CLIENT_MAX_IPC_MSG_SIZE;
 
-	do {
+	while (dce_ipc_is_data_available(d, cl->int_type)) {
 		ret = dce_ipc_read_message(d, cl->int_type, msg_data, msg_length);
 		if (ret) {
 			dce_info(d, "Error in reading DCE msg for ch_type [%d]",
@@ -322,7 +333,7 @@ static void dce_client_process_event_ipc(struct tegra_dce *d,
 		}
 
 		cl->callback_fn(cl->handle, cl->type, msg_length, msg_data, cl->data);
-	} while (dce_ipc_is_data_available(d, cl->int_type));
+	}
 
 done:
 	if (msg_data)

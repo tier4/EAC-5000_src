@@ -16,29 +16,22 @@
 	ethernet@2310000 {
 		status = "okay";
 		nvidia,mac-addr-idx = <0>;
-		//nvidia,mdio_addr = <1>;
 		nvidia,phy-reset-gpio = <&tegra_main_gpio TEGRA234_MAIN_GPIO(G, 5) 0>;
 		phy-mode = "rgmii-id";
 		phy-handle = <&phy>;
-		///delete-node/ fixed-link;
-		nvidia,max-platform-mtu = <16383>;
+		/delete-node/ fixed-link;
+
 		mdio {
 			compatible = "nvidia,eqos-mdio";
 			#address-cells = <1>;
 			#size-cells = <0>;
 
 			phy: phy@1 {
-			        compatible = "ethernet-phy-id001c.c916";
-			        device_type = "ethernet-phy";
 				reg = <1>;
 				nvidia,phy-rst-pdelay-msec = <224>; /* msec */
 				nvidia,phy-rst-duration-usec = <10000>; /* usec */
-				#if TEGRA_ETHERNETPHY_DT_VERSION >= DT_VERSION_2
-                                /* use phy in poll mode */
-				#else
 				interrupt-parent = <&tegra_main_gpio>;
 				interrupts = <TEGRA234_MAIN_GPIO(G, 4) IRQ_TYPE_LEVEL_LOW>;
-				#endif
 			};
 		};
 	};

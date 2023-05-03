@@ -1,8 +1,10 @@
 ifeq ($(CONFIG_TEGRA_OOT_MODULE),m)
 NVPVA_OOT = y
 NVPVA_OBJ = m
+NVPVA_T23X = y
 else
 NVPVA_OBJ = $(CONFIG_TEGRA_GRHOST_PVA)
+NVPVA_T23X = $(CONFIG_TEGRA_T23X_GRHOST)
 endif
 
 GCOV_PROFILE := y
@@ -18,6 +20,8 @@ ccflags-y += -Werror
 ccflags-$(NVPVA_OOT) += -I$(srctree.host1x)/include
 ccflags-$(NVPVA_OOT) += -DCONFIG_TEGRA_HOST1X
 ccflags-$(NVPVA_OOT) += -DCONFIG_TEGRA_FUSE_UPSTREAM
+ccflags-$(NVPVA_OOT) += -DCONFIG_TEGRA_T23X_GRHOST
+ccflags-$(NVPVA_OOT) += -DTEGRA_OOT_MODULE
 
 nvhost-pva-objs  = \
 		pva.o \
@@ -42,17 +46,17 @@ nvhost-pva-objs  = \
 		pva_sha256.o \
 		pva_system_allow_list.o \
 		pva_vpu_app_auth.o \
-		pva_iommu_context_dev.o
+		pva_iommu_context_dev.o \
+		nvpva_syncpt.o
 
-obj-$(NVPVA_OBJ) += nvhost-pva.o
-
-nvhost-pva-t23x-objs  = \
+ifdef NVPVA_T23X
+nvhost-pva-objs  += \
 		pva_isr_t23x.o \
 		pva_mailbox_t23x.o \
 		pva_interface_regs_t23x.o \
 		pva_version_config_t23x.o \
 		pva_ccq_t23x.o
-
-ifdef CONFIG_TEGRA_T23X_GRHOST
-obj-$(NVPVA_OBJ) += nvhost-pva-t23x.o
 endif
+
+obj-$(NVPVA_OBJ) += nvhost-pva.o
+

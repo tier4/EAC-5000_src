@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -28,6 +28,7 @@ static const struct dce_platform_data t234_dce_platform_data = {
 	.stream_id = 0x08,
 	.phys_stream_id = 0x7f,
 	.fw_carveout_id = 9,
+	.hsp_id = 0x0,
 	.fw_vmindex = 0,
 	.fw_name = "display-t234-dce.bin",
 	.fw_dce_addr = 0x40000000,
@@ -42,34 +43,32 @@ __weak const struct of_device_id tegra_dce_of_match[] = {
 	},
 	{ },
 };
-
-/**
- * dce_set_pdata_dce - inline function to set the tegra_dce pointer in
- *			pdata point to actual tegra_dce data structure.
- *
- * @pdev : Pointer to the platform device data structure.
- * @d : Pointer pointing to actual tegra_dce data structure.
- *
- * Return :  Void.
- */
-static inline void dce_set_pdata_dce(struct platform_device *pdev,
-					struct tegra_dce *d)
-{
-	((struct dce_platform_data *)dev_get_drvdata(&pdev->dev))->d = d;
-}
+MODULE_DEVICE_TABLE(of, tegra_dce_of_match);
 
 /**
  * dce_get_pdata_dce - inline function to get the tegra_dce pointer
  *						from platform devicve.
  *
  * @pdev : Pointer to the platform device data structure.
- * @d : Pointer pointing to actual tegra_dce data structure.
  *
- * Return :  Void.
+ * Return :  Pointer pointing to tegra_dce data structure.
  */
 static inline struct tegra_dce *dce_get_pdata_dce(struct platform_device *pdev)
 {
-	return (((struct dce_platform_data *)dev_get_drvdata(&pdev->dev))->d);
+	return (&((struct dce_device *)dev_get_drvdata(&pdev->dev))->d);
+}
+
+/**
+ * dce_get_tegra_dce_from_dev - inline function to get the tegra_dce pointer
+ *						from devicve struct.
+ *
+ * @pdev : Pointer to the device data structure.
+ *
+ * Return :  Pointer pointing to tegra_dce data structure.
+ */
+static inline struct tegra_dce *dce_get_tegra_dce_from_dev(struct device *dev)
+{
+	return (&((struct dce_device *)dev_get_drvdata(dev))->d);
 }
 
 /**
@@ -82,7 +81,7 @@ static inline struct tegra_dce *dce_get_pdata_dce(struct platform_device *pdev)
  *
  * Return : 0 if success else the corresponding error value.
  */
-static int dce_init_dev_data(struct platform_device *pdev)
+static int dce_init_dev_data(struct platform_device *pdev, struct dce_platform_data *pdata)
 {
 	struct device *dev = &pdev->dev;
 	struct dce_device *d_dev = NULL;
@@ -91,17 +90,18 @@ static int dce_init_dev_data(struct platform_device *pdev)
 	if (!d_dev)
 		return -ENOMEM;
 
-	dce_set_pdata_dce(pdev, &d_dev->d);
 	d_dev->dev = dev;
+	d_dev->pdata = pdata;
 	d_dev->regs = of_iomap(dev->of_node, 0);
 	if (!d_dev->regs) {
 		dev_err(dev, "failed to map dce cluster IO space\n");
 		return -EINVAL;
 	}
 
-
+	dev_set_drvdata(dev, d_dev);
 	return 0;
 }
+
 /**
  * dce_isr - Handles dce interrupts
  */
@@ -118,12 +118,12 @@ static void dce_set_irqs(struct platform_device *pdev, bool en)
 {
 	int i = 0;
 	struct tegra_dce *d;
-	struct dce_platform_data *pdata = NULL;
+	struct dce_device *d_dev = NULL;
 
-	pdata = dev_get_drvdata(&pdev->dev);
-	d = pdata->d;
+	d_dev = dev_get_drvdata(&pdev->dev);
+	d = dce_get_pdata_dce(pdev);
 
-	for (i = 0; i < pdata->max_cpu_irqs; i++) {
+	for (i = 0; i < d_dev->max_cpu_irqs; i++) {
 		if (en)
 			enable_irq(d->irq[i]);
 		else
@@ -144,11 +144,12 @@ static int dce_req_interrupts(struct platform_device *pdev)
 	int ret = 0;
 	int no_ints = 0;
 	struct tegra_dce *d;
-	struct dce_platform_data *pdata = NULL;
+	struct dce_device *d_dev = NULL;
 
-	pdata = dev_get_drvdata(&pdev->dev);
-	d = pdata->d;
-	no_ints = of_irq_count(pdev->dev.of_node);
+	d_dev = dev_get_drvdata(&pdev->dev);
+	d = dce_get_pdata_dce(pdev);
+
+	no_ints = platform_irq_count(pdev);
 	if (no_ints == 0) {
 		dev_err(&pdev->dev,
 			"Invalid number of interrupts configured = %d",
@@ -156,10 +157,10 @@ static int dce_req_interrupts(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	pdata->max_cpu_irqs = no_ints;
+	d_dev->max_cpu_irqs = no_ints;
 
 	for (i = 0; i < no_ints; i++) {
-		ret = of_irq_get(pdev->dev.of_node, i);
+		ret = platform_get_irq(pdev, i);
 		if (ret < 0) {
 			dev_err(&pdev->dev,
 				"Getting dce intr lines failed with ret = %d",
@@ -202,9 +203,8 @@ static int tegra_dce_probe(struct platform_device *pdev)
 		err = -ENODATA;
 		goto err_get_pdata;
 	}
-	dev_set_drvdata(dev, pdata);
 
-	err = dce_init_dev_data(pdev);
+	err = dce_init_dev_data(pdev, pdata);
 	if (err) {
 		dev_err(dev, "failed to init device data with err = %d\n",
 			err);
@@ -218,7 +218,13 @@ static int tegra_dce_probe(struct platform_device *pdev)
 		goto req_intr_err;
 	}
 
-	d = pdata->d;
+	d = dce_get_pdata_dce(pdev);
+
+	/**
+	 * TODO: Get HSP_ID from DT
+	 */
+	d->hsp_id = pdata->hsp_id;
+
 
 	err = dce_driver_init(d);
 	if (err) {
@@ -251,13 +257,35 @@ static int tegra_dce_remove(struct platform_device *pdev)
 	/* TODO */
 	struct tegra_dce *d =
 			dce_get_pdata_dce(pdev);
+
+#ifdef CONFIG_DEBUG_FS
+	dce_remove_debug(d);
+#endif
+
 	dce_set_irqs(pdev, false);
 	dce_driver_deinit(d);
 	return 0;
 }
 
 #ifdef CONFIG_PM
-extern const struct dev_pm_ops dce_pm_ops;
+static int dce_pm_suspend(struct device *dev)
+{
+	struct tegra_dce *d = dce_get_tegra_dce_from_dev(dev);
+
+	return dce_pm_enter_sc7(d);
+}
+
+static int dce_pm_resume(struct device *dev)
+{
+	struct tegra_dce *d = dce_get_tegra_dce_from_dev(dev);
+
+	return dce_pm_exit_sc7(d);
+}
+
+const struct dev_pm_ops dce_pm_ops = {
+	.suspend = dce_pm_suspend,
+	.resume  = dce_pm_resume,
+};
 #endif
 
 static struct platform_driver tegra_dce_driver = {

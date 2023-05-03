@@ -59,6 +59,10 @@ struct hda_bus {
 	unsigned int no_response_fallback:1; /* don't fallback at RIRB error */
 	unsigned int bus_probing :1;	/* during probing process */
 	unsigned int keep_power:1;	/* keep power up for notification */
+	unsigned int jackpoll_in_suspend:1; /* keep jack polling during
+					     * runtime suspend
+					     */
+
 
 	int primary_dig_out_type;	/* primary digital out PCM type */
 	unsigned int mixer_assigned;	/* codec addr for mixer name */
@@ -179,10 +183,6 @@ struct hda_codec {
 	unsigned int addr;	/* codec addr*/
 	u32 probe_id; /* overridden id for probing */
 
-	/* fields for custom ELD */
-	unsigned int *custom_eld_data;
-	unsigned int custom_eld_size;
-
 	/* detected preset */
 	const struct hda_device_id *preset;
 	const char *modelname;	/* model name for preset */
@@ -278,10 +278,6 @@ struct hda_codec {
 	/* codec-specific additional proc output */
 	void (*proc_widget_hook)(struct snd_info_buffer *buffer,
 				 struct hda_codec *codec, hda_nid_t nid);
-
-	unsigned int recv_dec_cap;
-	unsigned int max_pcm_channels;
-	bool comfort_noise;
 
 	/* jack detection */
 	struct snd_array jacktbl;

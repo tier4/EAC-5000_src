@@ -26,8 +26,7 @@
 #include "tegra194-spmic-p2888-0001.dtsi"
 
 &head0 {
-	//status = "okay";
-	status = "disabled";
+	status = "okay";
 	nvidia,fb-bpp = <32>;
 	nvidia,fbmem-size = <265420800>; /* 8K (7680*4320) 32bpp double buffered */
 	nvidia,fb-flags = <TEGRA_FB_FLIP_ON_PROBE>;
@@ -51,6 +50,8 @@
 	nvidia,dc-flags = <TEGRA_DC_FLAG_ENABLED>;
 	vdd-dp-pwr-supply = <&p2888_spmic_sd0>;
 	avdd-dp-pll-supply = <&p2888_spmic_sd1>;
+	vdd-edp-sec-mode-supply = <&battery_reg>;
+	vdd-dp-pad-supply = <&battery_reg>;
 	vdd_hdmi_5v0-supply = <&p2822_vdd_hdmi_5v0>;
 };
 
@@ -65,43 +66,30 @@
 	nvidia,dc-flags = <TEGRA_DC_FLAG_ENABLED>;
 	vdd-dp-pwr-supply = <&p2888_spmic_sd0>;
 	avdd-dp-pll-supply = <&p2888_spmic_sd1>;
+	vdd-edp-sec-mode-supply = <&battery_reg>;
+	vdd-dp-pad-supply = <&battery_reg>;
 	vdd_hdmi_5v0-supply = <&p2822_vdd_hdmi_5v0>;
 };
 
 
 &sor0 {
 	status = "okay";
-	nvidia,active-panel = <&sor0_hdmi_display>;
+	nvidia,active-panel = <&sor0_dp_display>;
 };
 
 &sor0_dp_display {
-	//status = "okay";
-	status = "disabled";
-	nvidia,is_ext_dp_panel = <1>;
-};
-
-&sor0_hdmi_display {
 	status = "okay";
-	disp-default-out {
-		nvidia,out-flags = <TEGRA_DC_OUT_HOTPLUG_LOW>;
-	};
+	nvidia,is_ext_dp_panel = <1>;
 };
 
 &sor1 {
 	status = "okay";
-	nvidia,active-panel = <&sor1_hdmi_display>;
+	nvidia,active-panel = <&sor1_dp_display>;
 };
 
 &sor1_dp_display {
-	status = "disabled";
-	nvidia,is_ext_dp_panel = <1>;
-};
-
-&sor1_hdmi_display {
 	status = "okay";
-	disp-default-out {
-		nvidia,out-flags = <TEGRA_DC_OUT_HOTPLUG_LOW>;
-	};
+	nvidia,is_ext_dp_panel = <1>;
 };
 
 &sor2 {
@@ -129,6 +117,5 @@
 };
 
 &tegra_cec {
-	//status = "okay";
-	status = "disabled";
+	status = "okay";
 };

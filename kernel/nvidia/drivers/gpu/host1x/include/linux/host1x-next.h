@@ -8,11 +8,13 @@
 
 #include <linux/device.h>
 #include <linux/dma-direction.h>
+#include <linux/dma-fence.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
 
 enum host1x_class {
 	HOST1X_CLASS_HOST1X = 0x1,
+	HOST1X_CLASS_NVJPG1 = 0x7,
 	HOST1X_CLASS_NVENC = 0x21,
 	HOST1X_CLASS_NVENC1 = 0x22,
 	HOST1X_CLASS_GR2D = 0x51,
@@ -89,6 +91,7 @@ struct host1x_client_ops {
  * @parent: pointer to parent structure
  * @usecount: reference count for this structure
  * @lock: mutex for mutually exclusive concurrency
+ * @cache: host1x buffer object cache
  */
 struct host1x_client {
 	struct list_head list;
@@ -143,7 +146,7 @@ struct host1x_bo_ops {
 	struct host1x_bo *(*get)(struct host1x_bo *bo);
 	void (*put)(struct host1x_bo *bo);
 	struct host1x_bo_mapping *(*pin)(struct device *dev, struct host1x_bo *bo,
-					 enum dma_data_direction direction);
+					 enum dma_data_direction dir);
 	void (*unpin)(struct host1x_bo_mapping *map);
 	void *(*mmap)(struct host1x_bo *bo);
 	void (*munmap)(struct host1x_bo *bo, void *addr);
@@ -223,8 +226,10 @@ u32 host1x_syncpt_base_id(struct host1x_syncpt_base *base);
 void host1x_syncpt_release_vblank_reservation(struct host1x_client *client,
 					      u32 syncpt_id);
 
-struct dma_fence *host1x_fence_create(struct host1x_syncpt *sp, u32 threshold);
+struct dma_fence *host1x_fence_create(struct host1x_syncpt *sp, u32 threshold,
+				      bool timeout);
 int host1x_fence_extract(struct dma_fence *fence, u32 *id, u32 *threshold);
+void host1x_fence_cancel(struct dma_fence *fence);
 
 /*
  * host1x channel
@@ -235,6 +240,7 @@ struct host1x_job;
 
 struct host1x_channel *host1x_channel_request(struct host1x_client *client);
 struct host1x_channel *host1x_channel_get(struct host1x_channel *channel);
+void host1x_channel_stop(struct host1x_channel *channel);
 void host1x_channel_put(struct host1x_channel *channel);
 int host1x_job_submit(struct host1x_job *job);
 
@@ -290,8 +296,13 @@ struct host1x_job {
 	u32 syncpt_incrs;
 	u32 syncpt_end;
 
-	/* Completion waiter ref */
-	void *waiter;
+	/* Non-job tracking related syncpoint */
+	struct host1x_syncpt *secondary_syncpt;
+
+	/* Completion fence for job tracking */
+	struct dma_fence *fence;
+	struct dma_fence_cb fence_cb;
+	struct completion fence_cb_done;
 
 	/* Maximum time to wait for this job */
 	unsigned int timeout;
@@ -329,6 +340,14 @@ struct host1x_job {
 
 	/* Whether host1x-side firewall should be ran for this job or not */
 	bool enable_firewall;
+
+	/* Options for configuring engine data stream ID */
+	/* Context device to use for job */
+	struct host1x_memory_context *memory_context;
+	/* Stream ID to use if context isolation is disabled (!memory_context) */
+	u32 engine_fallback_streamid;
+	/* Engine offset to program stream ID to */
+	u32 engine_streamid_offset;
 };
 
 struct host1x_job *host1x_job_alloc(struct host1x_channel *ch,
@@ -447,5 +466,39 @@ int tegra_mipi_enable(struct tegra_mipi_device *device);
 int tegra_mipi_disable(struct tegra_mipi_device *device);
 int tegra_mipi_start_calibration(struct tegra_mipi_device *device);
 int tegra_mipi_finish_calibration(struct tegra_mipi_device *device);
+
+/* host1x memory contexts */
+
+struct host1x_memory_context {
+	struct host1x *host;
+
+	refcount_t ref;
+	struct pid *owner;
+
+	struct device dev;
+	u64 dma_mask;
+	u32 stream_id;
+};
+
+#ifdef CONFIG_IOMMU_API
+struct host1x_memory_context *host1x_memory_context_alloc(struct host1x *host1x,
+							  struct pid *pid);
+void host1x_memory_context_get(struct host1x_memory_context *cd);
+void host1x_memory_context_put(struct host1x_memory_context *cd);
+#else
+static inline struct host1x_memory_context *host1x_memory_context_alloc(struct host1x *host1x,
+									struct pid *pid)
+{
+	return NULL;
+}
+
+static inline void host1x_memory_context_get(struct host1x_memory_context *cd)
+{
+}
+
+static inline void host1x_memory_context_put(struct host1x_memory_context *cd)
+{
+}
+#endif
 
 #endif

@@ -258,6 +258,8 @@ static int nvdla_ping(struct platform_device *pdev,
 {
 	struct nvdla_cmd_mem_info ping_cmd_mem_info;
 	struct nvdla_cmd_data cmd_data;
+	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
+	struct nvdla_device *nvdla_dev = pdata->private_data;
 	u32 *ping_va;
 	int err = 0;
 
@@ -274,6 +276,14 @@ static int nvdla_ping(struct platform_device *pdev,
 		err = -ENODEV;
 		goto fail_to_on;
 	}
+
+	if (nvdla_dev == NULL) {
+		nvdla_dbg_err(pdev, "Invalid nvdla device\n");
+		err = -EINVAL;
+		goto fail_to_get_nvdla_dev;
+	}
+
+	mutex_lock(&nvdla_dev->ping_lock);
 
 	/* assign ping cmd buffer */
 	err = nvdla_get_cmd_memory(pdev, &ping_cmd_mem_info);
@@ -313,6 +323,8 @@ static int nvdla_ping(struct platform_device *pdev,
 fail_cmd:
 	nvdla_put_cmd_memory(pdev, ping_cmd_mem_info.index);
 fail_to_alloc:
+	mutex_unlock(&nvdla_dev->ping_lock);
+fail_to_get_nvdla_dev:
 	nvhost_module_idle(pdev);
 fail_to_on:
 fail_to_get_val_arg:
@@ -430,9 +442,14 @@ static int nvdla_send_emu_signal_fences(struct nvdla_emu_task *task,
 					info.id, info.thresh);
 
 			/* create fence name format example: nvdla0_1_fence */
-			snprintf(fence_name, sizeof(fence_name),
+			err = snprintf(fence_name, sizeof(fence_name),
 				"%s_%d_%d_prefence", dev_name(&dla_pdev->dev),
 				task->prefences[i].syncpoint_index, i);
+			if (err < 0) {
+				nvdla_dbg_err(dla_pdev,
+					"encoding error: %d\n", err);
+				goto fail;
+			}
 
 			err = nvhost_fence_create_fd(host_pdev,
 				&info, 1, fence_name,
@@ -472,9 +489,14 @@ static int nvdla_send_emu_signal_fences(struct nvdla_emu_task *task,
 					info.id, info.thresh);
 
 			/* create fence name format example: nvdla0_1_fence */
-			snprintf(fence_name, sizeof(fence_name),
+			err = snprintf(fence_name, sizeof(fence_name),
 				"%s_%d_%d_postfence", dev_name(&dla_pdev->dev),
 				task->postfences[i].syncpoint_index, i);
+			if (err < 0) {
+				nvdla_dbg_err(dla_pdev,
+					"encoding error: %d\n", err);
+				goto fail;
+			}
 
 			err = nvhost_fence_create_fd(host_pdev,
 				&info, 1, fence_name,
@@ -534,9 +556,14 @@ static int nvdla_update_signal_fences(struct nvdla_task *task,
 					info.id, info.thresh);
 
 			/* create fence name format example: nvdla0_1_fence */
-			snprintf(fence_name, sizeof(fence_name),
+			err = snprintf(fence_name, sizeof(fence_name),
 				"%s_%d_%d_prefence", dev_name(&dla_pdev->dev),
 				task->prefences[i].syncpoint_index, i);
+			if (err < 0) {
+				nvdla_dbg_err(dla_pdev,
+					"encoding error: %d\n", err);
+				goto fail;
+			}
 
 			err = nvhost_fence_create_fd(host_pdev,
 				&info, 1, fence_name,
@@ -576,9 +603,14 @@ static int nvdla_update_signal_fences(struct nvdla_task *task,
 					info.id, info.thresh);
 
 			/* create fence name format example: nvdla0_1_fence */
-			snprintf(fence_name, sizeof(fence_name),
+			err = snprintf(fence_name, sizeof(fence_name),
 				"%s_%d_%d_postfence", dev_name(&dla_pdev->dev),
 				task->postfences[i].syncpoint_index, i);
+			if (err < 0) {
+				nvdla_dbg_err(dla_pdev,
+					"encoding error: %d\n", err);
+				goto fail;
+			}
 
 			err = nvhost_fence_create_fd(host_pdev,
 				&info, 1, fence_name,
@@ -875,6 +907,22 @@ static int nvdla_emu_task_submit(struct nvdla_private *priv, void *arg)
 		}
 
 		nvdla_dbg_info(pdev, "submit [%d]th task", i + 1);
+
+		if (local_task.num_prefences > MAX_NVDLA_EMU_PREFENCES_PER_TASK) {
+			nvdla_dbg_err(pdev, "#prefences[%u] > expected[%d]\n",
+				local_task.num_prefences,
+				MAX_NVDLA_EMU_PREFENCES_PER_TASK);
+			err = -EINVAL;
+			goto exit;
+		}
+
+		if (local_task.num_postfences > MAX_NVDLA_EMU_POSTFENCES_PER_TASK) {
+			nvdla_dbg_err(pdev, "#postfences[%u] > expected[%d]\n",
+				local_task.num_postfences,
+				MAX_NVDLA_EMU_POSTFENCES_PER_TASK);
+			err = -EINVAL;
+			goto exit;
+		}
 
 		task->num_prefences = local_task.num_prefences;
 		task->num_postfences = local_task.num_postfences;

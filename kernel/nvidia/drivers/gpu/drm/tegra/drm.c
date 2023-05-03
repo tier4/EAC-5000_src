@@ -10,19 +10,23 @@
 #include <linux/iommu.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 #include <linux/version.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)
 #include <drm/drm_aperture.h>
-#endif
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_debugfs.h>
 #include <drm/drm_drv.h>
 #include <drm/drm_fourcc.h>
+#include <drm/drm_framebuffer.h>
 #include <drm/drm_ioctl.h>
 #include <drm/drm_prime.h>
 #include <drm/drm_vblank.h>
+
+#if IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU)
+#include <asm/dma-iommu.h>
+#endif
 
 #include "dc.h"
 #include "drm.h"
@@ -34,7 +38,7 @@
 #define DRIVER_DATE "20120330"
 #define DRIVER_MAJOR 1
 #define DRIVER_MINOR 0
-#define DRIVER_PATCHLEVEL 0
+#define DRIVER_PATCHLEVEL 99
 
 #define CARVEOUT_SZ SZ_64M
 #define CDMA_GATHER_FETCHES_MAX_NB 16383
@@ -63,14 +67,12 @@ static const struct drm_mode_config_funcs tegra_drm_mode_config_funcs = {
 static void tegra_atomic_post_commit(struct drm_device *drm,
 				     struct drm_atomic_state *old_state)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 	struct drm_crtc_state *old_crtc_state __maybe_unused;
 	struct drm_crtc *crtc;
 	unsigned int i;
 
 	for_each_old_crtc_in_state(old_state, crtc, old_crtc_state, i)
 		tegra_crtc_atomic_post_commit(crtc, old_state);
-#endif
 }
 
 static void tegra_atomic_commit_tail(struct drm_atomic_state *old_state)
@@ -121,6 +123,7 @@ static int tegra_drm_open(struct drm_device *drm, struct drm_file *filp)
 static void tegra_drm_context_free(struct tegra_drm_context *context)
 {
 	context->client->ops->close_channel(context);
+	pm_runtime_put(context->client->base.dev);
 	kfree(context);
 }
 
@@ -431,13 +434,20 @@ static int tegra_client_open(struct tegra_drm_file *fpriv,
 {
 	int err;
 
-	err = client->ops->open_channel(client, context);
-	if (err < 0)
+	err = pm_runtime_resume_and_get(client->base.dev);
+	if (err)
 		return err;
+
+	err = client->ops->open_channel(client, context);
+	if (err < 0) {
+		pm_runtime_put(client->base.dev);
+		return err;
+	}
 
 	err = idr_alloc(&fpriv->legacy_contexts, context, 1, 0, GFP_KERNEL);
 	if (err < 0) {
 		client->ops->close_channel(context);
+		pm_runtime_put(client->base.dev);
 		return err;
 	}
 
@@ -867,11 +877,7 @@ static void tegra_debugfs_init(struct drm_minor *minor)
 }
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 static const struct drm_driver tegra_drm_driver = {
-#else
-static struct drm_driver tegra_drm_driver = {
-#endif
 	.driver_features = DRIVER_MODESET | DRIVER_GEM |
 			   DRIVER_ATOMIC | DRIVER_RENDER | DRIVER_SYNCOBJ,
 	.open = tegra_drm_open,
@@ -940,6 +946,17 @@ int host1x_client_iommu_attach(struct host1x_client *client)
 	struct tegra_drm *tegra = drm->dev_private;
 	struct iommu_group *group = NULL;
 	int err;
+
+#if IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU)
+	if (client->dev->archdata.mapping) {
+		struct dma_iommu_mapping *mapping =
+				to_dma_iommu_mapping(client->dev);
+		arm_iommu_detach_device(client->dev);
+		arm_iommu_release_mapping(mapping);
+
+		domain = iommu_get_domain_for_dev(client->dev);
+	}
+#endif
 
 	/*
 	 * If the host1x client is already attached to an IOMMU domain that is
@@ -1156,10 +1173,6 @@ static int host1x_drm_probe(struct host1x_device *dev)
 	drm->mode_config.max_width = 0;
 	drm->mode_config.max_height = 0;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0)
-	drm->mode_config.allow_fb_modifiers = true;
-#endif
-
 	drm->mode_config.normalize_zpos = true;
 
 	drm->mode_config.funcs = &tegra_drm_mode_config_funcs;
@@ -1243,11 +1256,8 @@ static int host1x_drm_probe(struct host1x_device *dev)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
 	err = drm_aperture_remove_framebuffers(false, &tegra_drm_driver);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)
-	err = drm_aperture_remove_framebuffers(false, "tegradrmfb");
 #else
-	err = drm_fb_helper_remove_conflicting_framebuffers(NULL, "tegradrmfb",
-							    false);
+	err = drm_aperture_remove_framebuffers(false, "tegradrmfb");
 #endif
 	if (err < 0)
 		goto hub;
@@ -1387,6 +1397,11 @@ static const struct of_device_id host1x_drm_subdevs[] = {
 	{ .compatible = "nvidia,tegra194-nvdec", },
 	{ .compatible = "nvidia,tegra194-nvenc", },
 	{ .compatible = "nvidia,tegra194-nvjpg", },
+	{ .compatible = "nvidia,tegra234-vic", },
+	{ .compatible = "nvidia,tegra234-nvdec", },
+	{ .compatible = "nvidia,tegra234-nvenc", },
+	{ .compatible = "nvidia,tegra234-nvjpg", },
+	{ .compatible = "nvidia,tegra234-ofa", },
 	{ /* sentinel */ }
 };
 
@@ -1413,11 +1428,17 @@ static struct platform_driver * const drivers[] = {
 	&tegra_nvdec_driver,
 	&tegra_nvenc_driver,
 	&tegra_nvjpg_driver,
+	&tegra_ofa_driver,
 };
 
 static int __init host1x_drm_init(void)
 {
 	int err;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+#endif
 
 	err = host1x_driver_register(&host1x_drm_driver);
 	if (err < 0)

@@ -175,6 +175,8 @@ struct nvhost_device_data t19_nvcsi_info = {
 		{"nvcsi", 400000000},
 	},
 	.devfs_name		= "nvcsi",
+	.autosuspend_delay      = 500,
+	.can_powergate = true,
 };
 #endif
 
@@ -193,6 +195,8 @@ struct nvhost_device_data t19_isp5_info = {
 	.ctrl_ops		= &tegra194_isp5_ctrl_ops,
 	.pre_virt_init		= isp5_priv_early_probe,
 	.post_virt_init		= isp5_priv_late_probe,
+	.autosuspend_delay      = 500,
+	.can_powergate = true,
 };
 #endif
 
@@ -568,40 +572,11 @@ static void t194_init_regs(struct platform_device *pdev, bool prod)
 {
 	struct nvhost_gating_register *cg_regs = t19x_host1x_gating_registers;
 	struct nvhost_streamid_mapping *map_regs = t19x_host1x_streamid_mapping;
-	ktime_t now, start = ktime_get();
-	u32 ram_init;
 	int ret = 0;
 	u64 cl = 0;
 
 	if (nvhost_dev_is_virtual(pdev) == true) {
 		return;
-	}
-
-	/* Ensure that HW has finished initializing syncpt RAM prior to use */
-	for (;;) {
-		/* XXX: This retry loop takes too long to timeout on VDK */
-		if (tegra_platform_is_sim()) {
-			pr_info("%s: Skipping ram_init done check on sim.\n",
-				__func__);
-			break;
-		}
-
-		ram_init = host1x_hypervisor_readl(pdev,
-					host1x_sync_syncpt_ram_init_0_r());
-		if (!host1x_sync_syncpt_ram_init_0_ram_init_v(ram_init)) {
-			pr_info("%s: Host1x HW syncpt ram init disabled\n",
-				__func__);
-			break;
-		}
-		if (host1x_sync_syncpt_ram_init_0_ram_init_done_v(ram_init))
-			break;
-
-		now = ktime_get();
-		if (ktime_ms_delta(now, start) >= SYNCPT_RAM_INIT_TIMEOUT_MS) {
-			pr_err("%s: Timed out waiting for syncpt ram init!\n",
-				__func__);
-			break;
-		}
 	}
 
 	/* Use old mapping registers on older simulator CLs */

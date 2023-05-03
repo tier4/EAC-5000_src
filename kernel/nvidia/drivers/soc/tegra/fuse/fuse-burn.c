@@ -679,7 +679,7 @@ static ssize_t tegra_fuse_calc_h2_code(struct device *dev,
 #define FUSE_OPT_FAB_CODE_MASK		0x3f
 #define FUSE_OPT_LOT_CODE_0		0x108
 #define FUSE_OPT_LOT_CODE_1		0x10c
-#define FUSE_OPT_WAFER_ID		0x118
+#define FUSE_OPT_WAFER_ID		0x110
 #define FUSE_OPT_WAFER_ID_MASK		0x3f
 #define FUSE_OPT_X_COORDINATE		0x114
 #define FUSE_OPT_X_COORDINATE_MASK	0x1ff
@@ -961,9 +961,9 @@ static struct tegra_fuse_hw_feature tegra194_fuse_chip_data = {
 		FUSE_BURN_DATA(odm_lock, 0, 6, 4, 0x8, true, false),
 		FUSE_BURN_DATA(arm_jtag_disable, 0x0, 12, 1, 0xb8, true, false),
 		FUSE_BURN_DATA(odm_production_mode, 0, 11, 1, 0xa0, true, false),
-		FUSE_BURN_DATA(secure_boot_key, 0x61, 1, 128, 0xa4, true, true),
-		FUSE_BURN_DATA(public_key, 0x59, 1, 256, 0x64, true, true),
-		FUSE_BURN_DATA(boot_security_info, 0x66, 21, 16, 0x168, true, false),
+		FUSE_BURN_DATA(secure_boot_key, 0x61, 1, 128, 0xa4, false, true),
+		FUSE_BURN_DATA(public_key, 0x59, 1, 256, 0x64, false, true),
+		FUSE_BURN_DATA(boot_security_info, 0x66, 21, 16, 0x168, false, false),
 		FUSE_BURN_DATA(debug_authentication, 0, 20, 5, 0x1e4, true, false),
 		FUSE_BURN_DATA(odm_info, 0x67, 5, 16, 0x19c, false, false),
 		FUSE_BURN_DATA(pdi, 0x40, 17, 64, 0x300, false, false),

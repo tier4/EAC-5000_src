@@ -110,7 +110,8 @@ int32_t pva_get_sym_offset(struct nvpva_elf_context *d, uint16_t exe_id,
 	if ((!pva_vpu_elf_is_registered(d, exe_id))
 	   || (addr == NULL)
 	   || (size == NULL)
-	   || (sym_id >= get_elf_image(d, exe_id)->num_symbols))
+	   || (sym_id >= get_elf_image(d, exe_id)->num_symbols)
+	   || (sym_id == NVPVA_INVALID_SYMBOL_ID))
 		return -EINVAL;
 
 	*addr = get_elf_image(d, exe_id)->sym[sym_id].addr;
@@ -138,6 +139,8 @@ static int32_t pva_vpu_elf_alloc_mem(struct pva *pva,
 	va = dma_alloc_coherent(&pva->pdev->dev, size, &pa, GFP_KERNEL);
 	if (va == NULL)
 		goto fail;
+
+	nvpva_dbg_info(pva, "vpu app addr = %llx", (u64)pa);
 
 	buffer->size = size;
 	buffer->va = va;
@@ -573,8 +576,14 @@ static int32_t update_exports_symbol(void *elf, const struct elf_section_header 
 				     struct pva_elf_symbol *symID)
 {
 	const u8 *data;
-	const char *section_name = elf_section_name(elf, section_header);
-	int32_t section_type = find_pva_ucode_segment_type(section_name, section_header->addr);
+	const char *section_name;
+	int32_t section_type;
+
+	section_name = elf_section_name(elf, section_header);
+	if (section_name == NULL)
+		return -EINVAL;
+
+	section_type = find_pva_ucode_segment_type(section_name, section_header->addr);
 	if (section_type == PVA_SEG_VPU_IN_PARAMS) {
 		uint32_t symOffset = symID->addr - section_header->addr;
 		data = elf_section_contents(elf, section_header);
@@ -648,6 +657,11 @@ populate_symtab(void *elf, struct nvpva_elf_context *d,
 			continue;
 
 		symname = elf_symbol_name(elf, section_header, i);
+		if (symname == NULL) {
+			ret = -EINVAL;
+			goto fail;
+		}
+
 		stringsize = strnlen(symname, (ELF_MAX_SYMBOL_LENGTH - 1));
 		symID = &get_elf_image(d, exe_id)->sym[num_symbols];
 		symID->symbol_name =
@@ -1130,6 +1144,11 @@ nvpva_validate_vmem_offset(const uint32_t vmem_offset,
 
 	int i;
 	int32_t err = -EINVAL;
+
+	if (hw_gen < 0 || hw_gen > NUM_HEM_GEN) {
+		pr_err("invalid hw_gen index: %d", hw_gen);
+		return err;
+	}
 
 	for (i = VMEM_REGION_COUNT; i > 0; i--) {
 		if (vmem_offset >= vmem_regions_tab[hw_gen][i-1].start)

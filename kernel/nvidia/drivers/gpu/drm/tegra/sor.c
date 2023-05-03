@@ -17,8 +17,6 @@
 
 #include <soc/tegra/pmc.h>
 
-#include <drm/drm_atomic_helper.h>
-#include <drm/drm_debugfs.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 #include <drm/display/drm_dp_helper.h>
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
@@ -26,13 +24,15 @@
 #else
 #include <drm/drm_dp_helper.h>
 #endif
-#include <drm/drm_file.h>
-#include <drm/drm_panel.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
 #include <drm/display/drm_scdc_helper.h>
 #else
 #include <drm/drm_scdc_helper.h>
 #endif
+#include <drm/drm_atomic_helper.h>
+#include <drm/drm_debugfs.h>
+#include <drm/drm_file.h>
+#include <drm/drm_panel.h>
 #include <drm/drm_simple_kms_helper.h>
 
 #include "dc.h"
@@ -40,6 +40,7 @@
 #include "drm.h"
 #include "hda.h"
 #include "sor.h"
+#include <trace/events/trace.h>
 
 #define SOR_REKEY 0x38
 
@@ -495,12 +496,15 @@ static inline u32 tegra_sor_readl(struct tegra_sor *sor, unsigned int offset)
 {
 	u32 value = readl(sor->regs + (offset << 2));
 
+	trace_sor_readl(sor->dev, offset, value);
+
 	return value;
 }
 
 static inline void tegra_sor_writel(struct tegra_sor *sor, u32 value,
 				    unsigned int offset)
 {
+	trace_sor_writel(sor->dev, offset, value);
 	writel(value, sor->regs + (offset << 2));
 }
 
@@ -3122,14 +3126,8 @@ static int tegra_sor_init(struct host1x_client *client)
 	 * kernel is possible.
 	 */
 	if (sor->rst) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 		err = pm_runtime_resume_and_get(sor->dev);
 		if (err < 0) {
-#else
-		err = pm_runtime_get_sync(sor->dev);
-		if (err < 0) {
-			pm_runtime_put_noidle(sor->dev);
-#endif
 			dev_err(sor->dev, "failed to get runtime PM: %d\n", err);
 			return err;
 		}
@@ -3244,14 +3242,8 @@ static int tegra_sor_runtime_resume(struct host1x_client *client)
 	struct device *dev = client->dev;
 	int err;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 	err = pm_runtime_resume_and_get(dev);
 	if (err < 0) {
-#else
-	err = pm_runtime_get_sync(dev);
-	if (err < 0) {
-		pm_runtime_put_noidle(dev);
-#endif
 		dev_err(dev, "failed to get runtime PM: %d\n", err);
 		return err;
 	}

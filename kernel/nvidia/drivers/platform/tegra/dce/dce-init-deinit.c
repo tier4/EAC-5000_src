@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -26,6 +26,11 @@ int dce_driver_init(struct tegra_dce *d)
 {
 	int ret = 0;
 
+	/**
+	 * Set dce boot satus to false
+	 */
+	dce_set_boot_complete(d, false);
+
 	ret = dce_boot_interface_init(d);
 	if (ret) {
 		dce_err(d, "dce boot interface init failed");
@@ -44,6 +49,12 @@ int dce_driver_init(struct tegra_dce *d)
 		goto err_client_init;
 	}
 
+	ret = dce_work_cond_sw_resource_init(d);
+	if (ret) {
+		dce_err(d, "dce sw resource init failed");
+		goto err_sw_init;
+	}
+
 	ret = dce_fsm_init(d);
 	if (ret) {
 		dce_err(d, "dce worker thread init failed");
@@ -53,6 +64,8 @@ int dce_driver_init(struct tegra_dce *d)
 	return ret;
 
 err_fsm_init:
+	dce_work_cond_sw_resource_deinit(d);
+err_sw_init:
 	dce_client_deinit(d);
 err_client_init:
 	dce_admin_deinit(d);
@@ -76,6 +89,8 @@ void dce_driver_deinit(struct tegra_dce *d)
 {
 	/*  TODO : Reset DCE ? */
 	dce_fsm_deinit(d);
+
+	dce_work_cond_sw_resource_deinit(d);
 
 	dce_client_deinit(d);
 

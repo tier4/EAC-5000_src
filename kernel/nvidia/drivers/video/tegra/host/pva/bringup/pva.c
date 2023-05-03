@@ -737,7 +737,7 @@ int pva_prepare_poweroff(struct platform_device *pdev)
 static int pva_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct nvhost_device_data *pdata;
+	struct nvhost_device_data *pdata = NULL;
 	const struct of_device_id *match;
 	struct pva *pva;
 	int err = 0;
@@ -745,7 +745,8 @@ static int pva_probe(struct platform_device *pdev)
 	nvhost_dbg_fn("%s", __func__);
 
 	match = of_match_device(tegra_pva_of_match, dev);
-	pdata = (struct nvhost_device_data *)match->data;
+	if (match)
+		pdata = (struct nvhost_device_data *)match->data;
 
 	WARN_ON(!pdata);
 	if (!pdata) {
@@ -907,6 +908,7 @@ static int __exit pva_remove(struct platform_device *pdev)
 	struct pva *pva = pdata->private_data;
 	int i;
 
+	nvhost_syncpt_unit_interface_deinit(pdev);
 	nvhost_queue_deinit(pva->pool);
 	nvhost_client_device_release(pdev);
 	for (i = 0; i < pva->version_config->irq_count; i++)

@@ -596,8 +596,10 @@ struct sg_table *__nvmap_sg_table(struct nvmap_client *client,
 				  struct nvmap_handle *h);
 void __nvmap_free_sg_table(struct nvmap_client *client,
 			   struct nvmap_handle *h, struct sg_table *sgt);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 void *__nvmap_kmap(struct nvmap_handle *h, unsigned int pagenum);
 void __nvmap_kunmap(struct nvmap_handle *h, unsigned int pagenum, void *addr);
+#endif
 void *__nvmap_mmap(struct nvmap_handle *h);
 void __nvmap_munmap(struct nvmap_handle *h, void *addr);
 int __nvmap_map(struct nvmap_handle *h, struct vm_area_struct *vma);
@@ -913,4 +915,7 @@ struct nvmap_handle *nvmap_handle_get_from_id(struct nvmap_client *client,
 int nvmap_dma_alloc_from_dev_coherent(struct device *dev, ssize_t size,
 		dma_addr_t *dma_handle, void **ret);
 int nvmap_dma_release_from_dev_coherent(struct device *dev, int order, void *vaddr);
+
+extern void __dma_flush_area(const void *cpu_va, size_t size);
+extern void __dma_map_area(const void *cpu_va, size_t size, int dir);
 #endif /* __VIDEO_TEGRA_NVMAP_NVMAP_H */

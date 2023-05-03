@@ -193,9 +193,9 @@ static irqreturn_t nvvrs_rtc_irq_handler(int irq, void *data)
 	ret = nvvrs_rtc_disable_alarm(info);
 	if (ret < 0)
 		dev_err(info->dev, "Failed to disable alarm: ret %d\n", ret);
-        
-	rtc_update_irq(info->rtc_dev, 1, RTC_IRQF | RTC_UF);
-        dev_info(info->dev, "RTC update IRQ!!!!!\n");	
+
+	rtc_update_irq(info->rtc_dev, 1, RTC_IRQF | RTC_AF);
+
 	return IRQ_HANDLED;
 }
 

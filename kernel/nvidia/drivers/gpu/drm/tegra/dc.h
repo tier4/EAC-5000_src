@@ -8,7 +8,6 @@
 #define TEGRA_DC_H 1
 
 #include <linux/host1x-next.h>
-#include <linux/version.h>
 
 #include <drm/drm_crtc.h>
 
@@ -34,12 +33,6 @@ static inline struct tegra_dc_state *to_dc_state(struct drm_crtc_state *state)
 		return container_of(state, struct tegra_dc_state, base);
 
 	return NULL;
-}
-
-static inline const struct tegra_dc_state *
-to_const_dc_state(const struct drm_crtc_state *state)
-{
-	return to_dc_state((struct drm_crtc_state *)state);
 }
 
 struct tegra_dc_stats {
@@ -83,6 +76,7 @@ struct tegra_dc_soc_info {
 	bool has_win_b_vfilter_mem_client;
 	bool has_win_c_without_vert_filter;
 	bool plane_tiled_memory_bandwidth_x2;
+	bool has_pll_d2_out0;
 };
 
 struct tegra_dc {
@@ -107,6 +101,8 @@ struct tegra_dc {
 	struct drm_info_list *debugfs_files;
 
 	const struct tegra_dc_soc_info *soc;
+
+	bool has_opp_table;
 };
 
 static inline struct tegra_dc *
@@ -123,12 +119,15 @@ static inline struct tegra_dc *to_tegra_dc(struct drm_crtc *crtc)
 static inline void tegra_dc_writel(struct tegra_dc *dc, u32 value,
 				   unsigned int offset)
 {
+	trace_dc_writel(dc->dev, offset, value);
 	writel(value, dc->regs + (offset << 2));
 }
 
 static inline u32 tegra_dc_readl(struct tegra_dc *dc, unsigned int offset)
 {
 	u32 value = readl(dc->regs + (offset << 2));
+
+	trace_dc_readl(dc->dev, offset, value);
 
 	return value;
 }
@@ -165,10 +164,8 @@ int tegra_dc_state_setup_clock(struct tegra_dc *dc,
 			       struct drm_crtc_state *crtc_state,
 			       struct clk *clk, unsigned long pclk,
 			       unsigned int div);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 void tegra_crtc_atomic_post_commit(struct drm_crtc *crtc,
 				   struct drm_atomic_state *state);
-#endif
 
 /* from rgb.c */
 int tegra_dc_rgb_probe(struct tegra_dc *dc);
@@ -640,6 +637,13 @@ int tegra_dc_rgb_exit(struct tegra_dc *dc);
 #define WIN_COLOR_DEPTH_A8B8G8R8       36
 #define WIN_COLOR_DEPTH_B8G8R8X8       37
 #define WIN_COLOR_DEPTH_R8G8B8X8       38
+#define WIN_COLOR_DEPTH_YCbCr444P      41
+#define WIN_COLOR_DEPTH_YCrCb420SP     42
+#define WIN_COLOR_DEPTH_YCbCr420SP     43
+#define WIN_COLOR_DEPTH_YCrCb422SP     44
+#define WIN_COLOR_DEPTH_YCbCr422SP     45
+#define WIN_COLOR_DEPTH_YCrCb444SP     48
+#define WIN_COLOR_DEPTH_YCbCr444SP     49
 #define WIN_COLOR_DEPTH_X8B8G8R8       65
 #define WIN_COLOR_DEPTH_X8R8G8B8       66
 

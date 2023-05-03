@@ -41,6 +41,7 @@ static phys_addr_t handle_phys(struct nvmap_handle *h)
 	return h->carveout->base;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 void *__nvmap_kmap(struct nvmap_handle *h, unsigned int pagenum)
 {
 	phys_addr_t paddr;
@@ -80,8 +81,11 @@ void *__nvmap_kmap(struct nvmap_handle *h, unsigned int pagenum)
 						h->pgalloc.pages[pagenum]));
 		else
 			paddr = h->carveout->base + pagenum * PAGE_SIZE;
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+		addr = ioremap_prot(phys_addr, PAGE_SIZE, pgprot_val(prot));
+#else
 		addr = __ioremap(paddr, PAGE_SIZE, prot);
+#endif
 		if (addr == NULL)
 			goto out;
 		kaddr = (unsigned long)addr;
@@ -126,6 +130,7 @@ out:
 	nvmap_kmaps_dec(h);
 	nvmap_handle_put(h);
 }
+#endif
 
 void *__nvmap_mmap(struct nvmap_handle *h)
 {
@@ -201,8 +206,12 @@ void *__nvmap_mmap(struct nvmap_handle *h)
 
 		vaddr = vmap(pages, nr_pages, VM_MAP, prot);
 	} else {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+		vaddr = ioremap_prot(h->carveout->base, adj_size, pgprot_val(prot));
+#else
 		vaddr = (__force void *)__ioremap(h->carveout->base, adj_size,
 			 prot);
+#endif
 	}
 	if (vaddr == NULL)
 		goto out;

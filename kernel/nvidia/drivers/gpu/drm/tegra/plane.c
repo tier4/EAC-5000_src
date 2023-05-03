@@ -3,6 +3,7 @@
  * Copyright (C) 2017 NVIDIA CORPORATION.  All rights reserved.
  */
 
+#include <linux/dma-mapping.h>
 #include <linux/iommu.h>
 #include <linux/interconnect.h>
 #include <linux/version.h>
@@ -10,11 +11,8 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_fourcc.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
+#include <drm/drm_framebuffer.h>
 #include <drm/drm_gem_atomic_helper.h>
-#else
-#include <drm/drm_gem_framebuffer_helper.h>
-#endif
 #include <drm/drm_plane_helper.h>
 
 #include "dc.h"
@@ -118,7 +116,11 @@ static bool tegra_plane_format_mod_supported(struct drm_plane *plane,
 		return true;
 
 	/* check for the sector layout bit */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+	if (fourcc_mod_is_vendor(modifier, NVIDIA)) {
+#else
 	if ((modifier >> 56) == DRM_FORMAT_MOD_VENDOR_NVIDIA) {
+#endif
 		if (modifier & DRM_FORMAT_MOD_NVIDIA_SECTOR_LAYOUT) {
 			if (!tegra_plane_supports_sector_layout(plane))
 				return false;
@@ -210,11 +212,7 @@ int tegra_plane_prepare_fb(struct drm_plane *plane,
 	if (!state->fb)
 		return 0;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
 	err = drm_gem_plane_helper_prepare_fb(plane, state);
-#else
-	err = drm_gem_fb_prepare_fb(plane, state);
-#endif
 	if (err < 0)
 		return err;
 
@@ -422,12 +420,56 @@ int tegra_plane_format(u32 fourcc, u32 *format, u32 *swap)
 		*swap = BYTE_SWAP_SWAP2;
 		break;
 
+	case DRM_FORMAT_YVYU:
+		if (!swap)
+			return -EINVAL;
+
+		*format = WIN_COLOR_DEPTH_YCbCr422;
+		*swap = BYTE_SWAP_SWAP4;
+		break;
+
+	case DRM_FORMAT_VYUY:
+		if (!swap)
+			return -EINVAL;
+
+		*format = WIN_COLOR_DEPTH_YCbCr422;
+		*swap = BYTE_SWAP_SWAP4HW;
+		break;
+
 	case DRM_FORMAT_YUV420:
 		*format = WIN_COLOR_DEPTH_YCbCr420P;
 		break;
 
 	case DRM_FORMAT_YUV422:
 		*format = WIN_COLOR_DEPTH_YCbCr422P;
+		break;
+
+	case DRM_FORMAT_YUV444:
+		*format = WIN_COLOR_DEPTH_YCbCr444P;
+		break;
+
+	case DRM_FORMAT_NV12:
+		*format = WIN_COLOR_DEPTH_YCbCr420SP;
+		break;
+
+	case DRM_FORMAT_NV21:
+		*format = WIN_COLOR_DEPTH_YCrCb420SP;
+		break;
+
+	case DRM_FORMAT_NV16:
+		*format = WIN_COLOR_DEPTH_YCbCr422SP;
+		break;
+
+	case DRM_FORMAT_NV61:
+		*format = WIN_COLOR_DEPTH_YCrCb422SP;
+		break;
+
+	case DRM_FORMAT_NV24:
+		*format = WIN_COLOR_DEPTH_YCbCr444SP;
+		break;
+
+	case DRM_FORMAT_NV42:
+		*format = WIN_COLOR_DEPTH_YCrCb444SP;
 		break;
 
 	default:
@@ -450,13 +492,13 @@ bool tegra_plane_format_is_indexed(unsigned int format)
 	return false;
 }
 
-bool tegra_plane_format_is_yuv(unsigned int format, bool *planar, unsigned int *bpc)
+bool tegra_plane_format_is_yuv(unsigned int format, unsigned int *planes, unsigned int *bpc)
 {
 	switch (format) {
 	case WIN_COLOR_DEPTH_YCbCr422:
 	case WIN_COLOR_DEPTH_YUV422:
-		if (planar)
-			*planar = false;
+		if (planes)
+			*planes = 1;
 
 		if (bpc)
 			*bpc = 8;
@@ -471,8 +513,23 @@ bool tegra_plane_format_is_yuv(unsigned int format, bool *planar, unsigned int *
 	case WIN_COLOR_DEPTH_YUV422R:
 	case WIN_COLOR_DEPTH_YCbCr422RA:
 	case WIN_COLOR_DEPTH_YUV422RA:
-		if (planar)
-			*planar = true;
+	case WIN_COLOR_DEPTH_YCbCr444P:
+		if (planes)
+			*planes = 3;
+
+		if (bpc)
+			*bpc = 8;
+
+		return true;
+
+	case WIN_COLOR_DEPTH_YCrCb420SP:
+	case WIN_COLOR_DEPTH_YCbCr420SP:
+	case WIN_COLOR_DEPTH_YCrCb422SP:
+	case WIN_COLOR_DEPTH_YCbCr422SP:
+	case WIN_COLOR_DEPTH_YCrCb444SP:
+	case WIN_COLOR_DEPTH_YCbCr444SP:
+		if (planes)
+			*planes = 2;
 
 		if (bpc)
 			*bpc = 8;
@@ -480,8 +537,8 @@ bool tegra_plane_format_is_yuv(unsigned int format, bool *planar, unsigned int *
 		return true;
 	}
 
-	if (planar)
-		*planar = false;
+	if (planes)
+		*planes = 1;
 
 	return false;
 }
@@ -715,7 +772,6 @@ static const char * const tegra_plane_icc_names[TEGRA_DC_LEGACY_PLANES_NUM] = {
 
 int tegra_plane_interconnect_init(struct tegra_plane *plane)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 	const char *icc_name = tegra_plane_icc_names[plane->index];
 	struct device *dev = plane->dc->dev;
 	struct tegra_dc *dc = plane->dc;
@@ -743,7 +799,6 @@ int tegra_plane_interconnect_init(struct tegra_plane *plane)
 			return err;
 		}
 	}
-#endif
 
 	return 0;
 }

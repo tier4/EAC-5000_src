@@ -28,6 +28,11 @@
  */
 #define NVPVA_SYM_NAME_MAX_LEN 64U
 
+/**
+ * Invalid symbol ID
+ */
+#define NVPVA_INVALID_SYMBOL_ID 0xFFFF
+
 /*
  * PVA specific error code
  */
@@ -421,6 +426,12 @@ struct nvpva_dma_misr {
 	 * MC or L2SRAM
 	 */
 	uint64_t descriptor_mask;
+	/*
+	 * MISR timeout value configured in DMA common register
+	 * @ref PVA_DMA_COMMON_MISR_ENABLE. Timeout is caclutated as
+	 * number of AXI clock cycles.
+	 */
+	uint32_t misr_timeout;
 };
 
 /**

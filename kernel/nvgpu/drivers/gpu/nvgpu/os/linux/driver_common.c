@@ -19,6 +19,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 #include <linux/pm_runtime.h>
 #include <linux/of_platform.h>
 #include <uapi/linux/nvgpu.h>
@@ -99,6 +100,9 @@ static void nvgpu_init_vars(struct gk20a *g)
 
 	/* Init the clock req count to 0 */
 	nvgpu_atomic_set(&g->clk_arb_global_nr, 0);
+
+	/* Atomic set doesn't guarantee a barrier */
+	nvgpu_smp_wmb();
 
 	nvgpu_mutex_init(&l->ctrl_privs_lock);
 	nvgpu_init_list_node(&l->ctrl_privs);
@@ -182,7 +186,6 @@ static void nvgpu_init_timeslice(struct gk20a *g)
 static void nvgpu_init_pm_vars(struct gk20a *g)
 {
 	struct gk20a_platform *platform = dev_get_drvdata(dev_from_gk20a(g));
-	u32 i = 0;
 
 	/*
 	 * Set up initial power settings. For non-slicon platforms, disable
@@ -198,7 +201,12 @@ static void nvgpu_init_pm_vars(struct gk20a *g)
 	/* disable devfreq for pre-silicon */
 	if (!nvgpu_platform_is_silicon(g)) {
 		platform->devfreq_governor = NULL;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+		platform->qos_min_notify = NULL;
+		platform->qos_max_notify = NULL;
+#else
 		platform->qos_notify = NULL;
+#endif
 	}
 
 	nvgpu_set_enabled(g, NVGPU_GPU_CAN_ELCG,
@@ -219,7 +227,12 @@ static void nvgpu_init_pm_vars(struct gk20a *g)
 		platform->can_railgate_init = false;
 		/* Disable frequency scaling for hypervisor platforms */
 		platform->devfreq_governor = NULL;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+		platform->qos_min_notify = NULL;
+		platform->qos_max_notify = NULL;
+#else
 		platform->qos_notify = NULL;
+#endif
 	} else {
 		/* Always enable railgating on simulation platform */
 		platform->can_railgate_init = nvgpu_platform_is_simulation(g) ?
@@ -231,12 +244,6 @@ static void nvgpu_init_pm_vars(struct gk20a *g)
 	g->can_tpc_pg = platform->can_tpc_pg;
 	g->can_gpc_pg = platform->can_gpc_pg;
 	g->can_fbp_pg = platform->can_fbp_pg;
-
-	for (i = 0; i < MAX_PG_TPC_CONFIGS; i++)
-		g->valid_tpc_pg_mask[i] = platform->valid_tpc_pg_mask[i];
-
-	for (i = 0; i < MAX_PG_GPC_FBP_CONFIGS; i++)
-		g->valid_gpc_fbp_pg_mask[i] = platform->valid_gpc_fbp_pg_mask[i];
 #endif
 	g->ldiv_slowdown_factor = platform->ldiv_slowdown_factor_init;
 	/* if default delay is not set, set default delay to 500msec */

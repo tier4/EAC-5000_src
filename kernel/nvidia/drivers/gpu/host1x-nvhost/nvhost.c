@@ -12,6 +12,7 @@
 #include <linux/iommu.h>
 #include <linux/module.h>
 #include <linux/nvhost.h>
+#include <linux/nvhost_t194.h>
 #include <linux/of_platform.h>
 #include <linux/pm_runtime.h>
 #include <linux/reset.h>
@@ -23,6 +24,9 @@
 #define TEGRA194_SYNCPT_PAGE_SIZE 0x1000
 #define TEGRA194_SYNCPT_SHIM_BASE 0x60000000
 #define TEGRA194_SYNCPT_SHIM_SIZE 0x00400000
+#define TEGRA234_SYNCPT_PAGE_SIZE 0x10000
+#define TEGRA234_SYNCPT_SHIM_BASE 0x60000000
+#define TEGRA234_SYNCPT_SHIM_SIZE 0x04000000
 
 #define THI_STREAMID0	0x00000030
 #define THI_STREAMID1	0x00000034
@@ -31,6 +35,7 @@
 
 struct nvhost_syncpt_interface {
 	dma_addr_t base;
+	size_t size;
 	uint32_t page_size;
 };
 
@@ -54,35 +59,47 @@ EXPORT_SYMBOL(host1x_writel);
 
 static const struct of_device_id host1x_match[] = {
 	{ .compatible = "nvidia,tegra194-host1x", },
+	{ .compatible = "nvidia,tegra234-host1x", },
 	{},
 };
 
-static int nvhost_get_host1x_dev(struct platform_device *pdev)
+struct platform_device *nvhost_get_default_device(void)
 {
-	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct platform_device *host1x_pdev;
 	struct device_node *np;
 
 	np = of_find_matching_node(NULL, host1x_match);
-	if (!np) {
-		dev_err(&pdev->dev, "Failed to find host1x!\n");
-		return -ENODEV;
-	}
+	if (!np)
+		return NULL;
 
 	host1x_pdev = of_find_device_by_node(np);
+	if (!host1x_pdev)
+		return NULL;
+
+	return host1x_pdev;
+}
+EXPORT_SYMBOL(nvhost_get_default_device);
+
+struct host1x *nvhost_get_host1x(struct platform_device *pdev)
+{
+	struct platform_device *host1x_pdev;
+	struct host1x *host1x;
+
+	host1x_pdev = nvhost_get_default_device();
 	if (!host1x_pdev) {
 		dev_dbg(&pdev->dev, "host1x device not available\n");
-		return -EPROBE_DEFER;
+		return NULL;
 	}
 
-	pdata->host1x = platform_get_drvdata(host1x_pdev);
-	if (!pdata->host1x) {
+	host1x = platform_get_drvdata(host1x_pdev);
+	if (!host1x) {
 		dev_warn(&pdev->dev, "No platform data for host1x!\n");
-		return -ENODEV;
+		return NULL;
 	}
 
-	return 0;
+	return host1x;
 }
+EXPORT_SYMBOL(nvhost_get_host1x);
 
 static struct device *nvhost_client_device_create(struct platform_device *pdev,
 						  struct cdev *cdev,
@@ -129,9 +146,11 @@ int nvhost_client_device_get_resources(struct platform_device *pdev)
 	int err;
 	u32 i;
 
-	err = nvhost_get_host1x_dev(pdev);
-	if (err)
-		return err;
+	pdata->host1x = nvhost_get_host1x(pdev);
+	if (!pdata->host1x) {
+		dev_warn(&pdev->dev, "No platform data for host1x!\n");
+		return -ENODEV;
+	}
 
 	for (i = 0; i < pdev->num_resources; i++) {
 		void __iomem *regs = NULL;
@@ -250,7 +269,7 @@ bool nvhost_syncpt_is_valid_pt_ext(struct platform_device *pdev, u32 id)
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct host1x_syncpt *sp;
 
-	if (!pdata || pdata->host1x)
+	if (!pdata || !pdata->host1x)
 		return -ENODEV;
 
 	sp = host1x_syncpt_get_by_id_noref(pdata->host1x, id);
@@ -361,6 +380,12 @@ static int nvhost_syncpt_get_aperture(struct device_node *np, u64 *base,
 		return 0;
 	}
 
+	if (of_device_is_compatible(np, "nvidia,tegra234-host1x")) {
+		*base = TEGRA234_SYNCPT_SHIM_BASE;
+		*size = TEGRA234_SYNCPT_SHIM_SIZE;
+		return 0;
+	}
+
 	return -ENODEV;
 }
 
@@ -371,14 +396,52 @@ static int nvhost_syncpt_get_page_size(struct device_node *np, uint32_t *size)
 		return 0;
 	}
 
+	if (of_device_is_compatible(np, "nvidia,tegra234-host1x")) {
+		*size = TEGRA234_SYNCPT_PAGE_SIZE;
+		return 0;
+	}
+
 	return -ENODEV;
 }
+
+u32 nvhost_syncpt_unit_interface_get_byte_offset_ext(struct platform_device *pdev,
+						     u32 syncpt_id)
+{
+	uint32_t size;
+	int err;
+
+	err = nvhost_syncpt_get_page_size(pdev->dev.of_node, &size);
+	if (WARN_ON(err < 0))
+		return 0;
+
+	return syncpt_id * size;
+}
+EXPORT_SYMBOL(nvhost_syncpt_unit_interface_get_byte_offset_ext);
+
+u32 nvhost_syncpt_unit_interface_get_byte_offset(u32 syncpt_id)
+{
+	struct platform_device *host1x_pdev;
+
+	host1x_pdev = nvhost_get_default_device();
+	if (WARN_ON(!host1x_pdev))
+		return 0;
+
+	return nvhost_syncpt_unit_interface_get_byte_offset_ext(host1x_pdev,
+								syncpt_id);
+}
+EXPORT_SYMBOL(nvhost_syncpt_unit_interface_get_byte_offset);
+
+int nvhost_syncpt_unit_interface_get_aperture(struct platform_device *pdev,
+					      u64 *base, size_t *size)
+{
+	return nvhost_syncpt_get_aperture(pdev->dev.of_node, base, size);
+}
+EXPORT_SYMBOL(nvhost_syncpt_unit_interface_get_aperture);
 
 int nvhost_syncpt_unit_interface_init(struct platform_device *pdev)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct nvhost_syncpt_interface *syncpt_if;
-	size_t size;
 	u64 base;
 	int err;
 
@@ -387,7 +450,7 @@ int nvhost_syncpt_unit_interface_init(struct platform_device *pdev)
 		return -ENOMEM;
 
 	err = nvhost_syncpt_get_aperture(pdev->dev.parent->of_node, &base,
-					 &size);
+					 &syncpt_if->size);
 	if (err < 0) {
 		dev_err(&pdev->dev, "failed to get syncpt aperture\n");
 		return err;
@@ -402,20 +465,12 @@ int nvhost_syncpt_unit_interface_init(struct platform_device *pdev)
 
 	/* If IOMMU is enabled, map it into the device memory */
 	if (iommu_get_domain_for_dev(&pdev->dev)) {
-		struct scatterlist sg;
-
-		sg_init_table(&sg, 1);
-		sg_set_page(&sg, phys_to_page(base), size, 0);
-
-		err = dma_map_sg_attrs(&pdev->dev, &sg, 1,
-				       DMA_BIDIRECTIONAL,
-				       DMA_ATTR_SKIP_CPU_SYNC);
-		if (err == 0) {
-			err = -ENOMEM;
-			return err;
-		}
-
-		syncpt_if->base = sg_dma_address(&sg);
+		syncpt_if->base = dma_map_resource(&pdev->dev, base,
+						   syncpt_if->size,
+						   DMA_BIDIRECTIONAL,
+						   DMA_ATTR_SKIP_CPU_SYNC);
+		if (dma_mapping_error(&pdev->dev, syncpt_if->base))
+			return -ENOMEM;
 	} else {
 		syncpt_if->base = base;
 	}
@@ -424,11 +479,26 @@ int nvhost_syncpt_unit_interface_init(struct platform_device *pdev)
 
 	dev_info(&pdev->dev,
 		 "syncpt_unit_base %llx syncpt_unit_size %zx size %x\n",
-		 base, size, syncpt_if->page_size);
+		 base, syncpt_if->size, syncpt_if->page_size);
 
 	return 0;
 }
 EXPORT_SYMBOL(nvhost_syncpt_unit_interface_init);
+
+void nvhost_syncpt_unit_interface_deinit(struct platform_device *pdev)
+{
+	struct nvhost_syncpt_interface *syncpt_if;
+	struct nvhost_device_data *pdata;
+
+	if (iommu_get_domain_for_dev(&pdev->dev)) {
+		pdata = platform_get_drvdata(pdev);
+		syncpt_if = pdata->syncpt_unit_interface;
+
+		dma_unmap_resource(&pdev->dev, syncpt_if->base, syncpt_if->size,
+				   DMA_BIDIRECTIONAL, DMA_ATTR_SKIP_CPU_SYNC);
+	}
+}
+EXPORT_SYMBOL(nvhost_syncpt_unit_interface_deinit);
 
 dma_addr_t nvhost_syncpt_address(struct platform_device *pdev, u32 id)
 {
@@ -619,7 +689,7 @@ static void nvhost_intr_do_work(struct work_struct *work)
 
 	host1x_cb = container_of(work, struct nvhost_host1x_cb, work);
 	host1x_cb->notifier(host1x_cb->notifier_data, 0);
-	kfree(host1x_cb);
+	kfree_rcu(host1x_cb);
 }
 
 int nvhost_intr_register_notifier(struct platform_device *pdev,
@@ -637,7 +707,7 @@ int nvhost_intr_register_notifier(struct platform_device *pdev,
 	if (!sp)
 		return -EINVAL;
 
-	fence = host1x_fence_create(sp, thresh);
+	fence = host1x_fence_create(sp, thresh, true);
 	if (IS_ERR(fence)) {
 		pr_err("error %d during construction of fence!",
 			(int)PTR_ERR(fence));

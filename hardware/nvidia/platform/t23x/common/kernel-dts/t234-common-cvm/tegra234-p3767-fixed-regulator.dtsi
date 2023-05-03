@@ -52,7 +52,7 @@
 		p3767_vdd_1v8: regulator@3 {
 			compatible = "regulator-fixed";
 			reg = <3>;
-			regulator-name = "vdd-1v8";
+			regulator-name = "sys-vdd-1v8";
 			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <1800000>;
 			/*
@@ -143,6 +143,7 @@
 			regulator-min-microvolt = <3300000>;
 			regulator-max-microvolt = <3300000>;
 			gpio = <&tegra_aon_gpio TEGRA234_AON_GPIO(AA, 5) GPIO_ACTIVE_HIGH>;
+			enable-active-high;
  		};
 	};
 };

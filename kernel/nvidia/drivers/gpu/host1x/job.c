@@ -55,6 +55,7 @@ struct host1x_job *host1x_job_alloc(struct host1x_channel *ch,
 	job->enable_firewall = enable_firewall;
 
 	kref_init(&job->ref);
+	init_completion(&job->fence_cb_done);
 	job->channel = ch;
 
 	/* Redistribute memory to the structs  */
@@ -84,16 +85,30 @@ EXPORT_SYMBOL(host1x_job_get);
 static void job_free(struct kref *ref)
 {
 	struct host1x_job *job = container_of(ref, struct host1x_job, ref);
+	bool removed;
 
 	if (job->release)
 		job->release(job);
 
-	if (job->waiter)
-		host1x_intr_put_ref(job->syncpt->host, job->syncpt->id,
-				    job->waiter, false);
+	if (job->fence) {
+		removed = dma_fence_remove_callback(job->fence, &job->fence_cb);
+		if (!removed) {
+			/*
+			 * Wait until possible pending callback is no longer
+			 * using the job structure.
+			 */
+
+			wait_for_completion(&job->fence_cb_done);
+		}
+
+		dma_fence_put(job->fence);
+	}
 
 	if (job->syncpt)
 		host1x_syncpt_put(job->syncpt);
+
+	if (job->secondary_syncpt)
+		host1x_syncpt_put(job->secondary_syncpt);
 
 	kfree(job);
 }
@@ -138,11 +153,9 @@ static unsigned int pin_job(struct host1x *host, struct host1x_job *job)
 	struct host1x_client *client = job->client;
 	struct device *dev = client->dev;
 	struct host1x_job_gather *g;
-	struct iommu_domain *domain;
 	unsigned int i;
 	int err;
 
-	domain = iommu_get_domain_for_dev(dev);
 	job->num_unpins = 0;
 
 	for (i = 0; i < job->num_relocs; i++) {

@@ -5,6 +5,7 @@
 
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/dma-mapping.h>
 #include <linux/host1x-next.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -13,11 +14,12 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/reset.h>
-#include <linux/version.h>
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_blend.h>
 #include <drm/drm_fourcc.h>
+#include <drm/drm_framebuffer.h>
 #include <drm/drm_probe_helper.h>
 
 #include "drm.h"
@@ -421,16 +423,10 @@ static void tegra_dc_remove_shared_plane(struct tegra_dc *dc,
 }
 
 static int tegra_shared_plane_atomic_check(struct drm_plane *plane,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
 					   struct drm_atomic_state *state)
 {
 	struct drm_plane_state *new_plane_state = drm_atomic_get_new_plane_state(state,
 										 plane);
-#else
-					   struct drm_plane_state *state)
-{
-	struct drm_plane_state *new_plane_state = state;
-#endif
 	struct tegra_plane_state *plane_state = to_tegra_plane_state(new_plane_state);
 	struct tegra_shared_plane *tegra = to_tegra_shared_plane(plane);
 	struct tegra_bo_tiling *tiling = &plane_state->tiling;
@@ -485,15 +481,10 @@ static int tegra_shared_plane_atomic_check(struct drm_plane *plane,
 }
 
 static void tegra_shared_plane_atomic_disable(struct drm_plane *plane,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
 					      struct drm_atomic_state *state)
 {
 	struct drm_plane_state *old_state = drm_atomic_get_old_plane_state(state,
 									   plane);
-#else
-					      struct drm_plane_state *old_state)
-{
-#endif
 	struct tegra_plane *p = to_tegra_plane(plane);
 	struct tegra_dc *dc;
 	u32 value;
@@ -541,16 +532,10 @@ static inline u32 compute_phase_incr(fixed20_12 in, unsigned int out)
 }
 
 static void tegra_shared_plane_atomic_update(struct drm_plane *plane,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
 					     struct drm_atomic_state *state)
 {
 	struct drm_plane_state *new_state = drm_atomic_get_new_plane_state(state,
 									   plane);
-#else
-					     struct drm_plane_state *old_state)
-{
-	struct drm_plane_state *new_state = plane->state;
-#endif
 	struct tegra_plane_state *tegra_plane_state = to_tegra_plane_state(new_state);
 	struct tegra_dc *dc = to_tegra_dc(new_state->crtc);
 	unsigned int zpos = new_state->normalized_zpos;
@@ -558,8 +543,8 @@ static void tegra_shared_plane_atomic_update(struct drm_plane *plane,
 	struct tegra_plane *p = to_tegra_plane(plane);
 	u32 value, min_width, bypass = 0;
 	dma_addr_t base, addr_flag = 0;
-	unsigned int bpc;
-	bool yuv, planar;
+	unsigned int bpc, planes;
+	bool yuv;
 	int err;
 
 	/* rien ne va plus */
@@ -567,11 +552,7 @@ static void tegra_shared_plane_atomic_update(struct drm_plane *plane,
 		return;
 
 	if (!new_state->visible) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
 		tegra_shared_plane_atomic_disable(plane, state);
-#else
-		tegra_shared_plane_atomic_disable(plane, old_state);
-#endif
 		return;
 	}
 
@@ -581,7 +562,7 @@ static void tegra_shared_plane_atomic_update(struct drm_plane *plane,
 		return;
 	}
 
-	yuv = tegra_plane_format_is_yuv(tegra_plane_state->format, &planar, &bpc);
+	yuv = tegra_plane_format_is_yuv(tegra_plane_state->format, &planes, &bpc);
 
 	tegra_dc_assign_shared_plane(dc, p);
 
@@ -682,20 +663,26 @@ static void tegra_shared_plane_atomic_update(struct drm_plane *plane,
 	value = PITCH(fb->pitches[0]);
 	tegra_plane_writel(p, value, DC_WIN_PLANAR_STORAGE);
 
-	if (yuv && planar) {
+	if (yuv && planes > 1) {
 		base = tegra_plane_state->iova[1] + fb->offsets[1];
 		base |= addr_flag;
 
 		tegra_plane_writel(p, upper_32_bits(base), DC_WINBUF_START_ADDR_HI_U);
 		tegra_plane_writel(p, lower_32_bits(base), DC_WINBUF_START_ADDR_U);
 
-		base = tegra_plane_state->iova[2] + fb->offsets[2];
-		base |= addr_flag;
+		if (planes > 2) {
+			base = tegra_plane_state->iova[2] + fb->offsets[2];
+			base |= addr_flag;
 
-		tegra_plane_writel(p, upper_32_bits(base), DC_WINBUF_START_ADDR_HI_V);
-		tegra_plane_writel(p, lower_32_bits(base), DC_WINBUF_START_ADDR_V);
+			tegra_plane_writel(p, upper_32_bits(base), DC_WINBUF_START_ADDR_HI_V);
+			tegra_plane_writel(p, lower_32_bits(base), DC_WINBUF_START_ADDR_V);
+		}
 
-		value = PITCH_U(fb->pitches[2]) | PITCH_V(fb->pitches[2]);
+		value = PITCH_U(fb->pitches[1]);
+
+		if (planes > 2)
+			value |= PITCH_V(fb->pitches[2]);
+
 		tegra_plane_writel(p, value, DC_WIN_PLANAR_STORAGE_UV);
 	} else {
 		tegra_plane_writel(p, 0, DC_WINBUF_START_ADDR_U);
@@ -1009,14 +996,8 @@ static int tegra_display_hub_runtime_resume(struct host1x_client *client)
 	unsigned int i;
 	int err;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 	err = pm_runtime_resume_and_get(dev);
 	if (err < 0) {
-#else
-	err = pm_runtime_get_sync(dev);
-	if (err < 0) {
-		pm_runtime_put_noidle(dev);
-#endif
 		dev_err(dev, "failed to get runtime PM: %d\n", err);
 		return err;
 	}

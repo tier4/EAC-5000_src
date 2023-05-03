@@ -1,7 +1,7 @@
 /*
  * drivers/misc/tegra-profiler/main.c
  *
- * Copyright (c) 2013-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2013-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -28,7 +28,6 @@
 #include "hrt.h"
 #include "comm.h"
 #include "mmap.h"
-#include "debug.h"
 #include "tegra.h"
 #include "power_clk.h"
 #include "auth.h"
@@ -39,6 +38,11 @@
 
 #if defined(CONFIG_ARCH_TEGRA_19x_SOC) || defined(CONFIG_ARCH_TEGRA_194_SOC)
 #include "carmel_pmu.h"
+#endif
+
+#if defined(CONFIG_ARCH_TEGRA_23x_SOC) || defined(CONFIG_ARCH_TEGRA_234_SOC)
+#include "tegra23x_pmu_scf.h"
+#include "tegra23x_pmu_dsu.h"
 #endif
 
 #ifdef CONFIG_ARM64
@@ -147,6 +151,10 @@ static void stop(void)
 
 		if (ctx.carmel_pmu)
 			ctx.carmel_pmu_info.active = 0;
+		if (ctx.tegra23x_pmu_scf)
+			ctx.tegra23x_pmu_scf_info.active = 0;
+		if (ctx.tegra23x_pmu_dsu)
+			ctx.tegra23x_pmu_dsu_info.active = 0;
 
 		tegra_profiler_unlock();
 	}
@@ -163,7 +171,9 @@ is_event_supported(struct source_info *si, const struct quadd_event *event)
 	id = event->id;
 
 	if (type == QUADD_EVENT_TYPE_RAW ||
-	    type == QUADD_EVENT_TYPE_RAW_CARMEL_UNCORE)
+	    type == QUADD_EVENT_TYPE_RAW_CARMEL_UNCORE ||
+	    type == QUADD_EVENT_TYPE_RAW_T23X_UNCORE_SCF ||
+	    type == QUADD_EVENT_TYPE_RAW_T23X_UNCORE_DSU)
 		return (id & ~si->raw_event_mask) == 0;
 
 	if (type == QUADD_EVENT_TYPE_HARDWARE) {
@@ -180,6 +190,12 @@ static inline bool
 validate_freq(unsigned int freq)
 {
 	return freq >= 100 && freq <= 100000;
+}
+
+static inline bool
+validate_clk_freq(unsigned int freq)
+{
+	return freq > 0 && freq <= 1000;
 }
 
 static int
@@ -220,15 +236,15 @@ set_parameters_for_cpu(struct quadd_pmu_setup_for_cpu *params)
 		}
 	}
 
-	err = ctx.pmu->set_events(cpuid, pmu_events, nr_pmu);
-	if (err) {
+	err = ctx.pmu->set_events(cpuid, pmu_events, nr_pmu, 0);
+	if (err < 0) {
 		pr_err("PMU set parameters: error\n");
 		per_cpu(ctx_pmu_info, cpuid).active = 0;
 		return err;
 	}
 	per_cpu(ctx_pmu_info, cpuid).active = 1;
 
-	return err;
+	return 0;
 }
 
 static int verify_app(struct quadd_parameters *p, uid_t task_uid)
@@ -267,6 +283,30 @@ is_carmel_events(const struct quadd_event *events, int nr)
 	return false;
 }
 
+static inline bool
+is_tegra23x_pmu_scf_events(const struct quadd_event *events, int nr)
+{
+	int i;
+
+	for (i = 0; i < nr; i++) {
+		if (events[i].type == QUADD_EVENT_TYPE_RAW_T23X_UNCORE_SCF)
+			return true;
+	}
+	return false;
+}
+
+static inline bool
+is_tegra23x_pmu_dsu_events(const struct quadd_event *events, int nr)
+{
+	int i;
+
+	for (i = 0; i < nr; i++) {
+		if (events[i].type == QUADD_EVENT_TYPE_RAW_T23X_UNCORE_DSU)
+			return true;
+	}
+	return false;
+}
+
 static int
 set_parameters(struct quadd_parameters *p)
 {
@@ -275,8 +315,10 @@ set_parameters(struct quadd_parameters *p)
 	struct task_struct *task = NULL;
 	u64 *low_addr_p;
 	u32 extra, uncore_freq;
-#if defined(CONFIG_ARCH_TEGRA_19x_SOC) || defined(CONFIG_ARCH_TEGRA_194_SOC)
+#if defined(CONFIG_ARCH_TEGRA_19x_SOC) || defined(CONFIG_ARCH_TEGRA_194_SOC) || \
+    defined(CONFIG_ARCH_TEGRA_23x_SOC) || defined(CONFIG_ARCH_TEGRA_234_SOC)
 	int nr;
+	size_t base_idx = 0;
 #endif
 
 	extra = p->reserved[QUADD_PARAM_IDX_EXTRA];
@@ -329,6 +371,20 @@ set_parameters(struct quadd_parameters *p)
 	if (ctx.mode_is_sampling && !validate_freq(p->freq))
 		return -EINVAL;
 
+	if (p->power_rate_freq != 0 && !validate_clk_freq(p->power_rate_freq))
+		return -EINVAL;
+	if (p->ma_freq != 0 && !validate_clk_freq(p->ma_freq))
+		return -EINVAL;
+
+	ctx.exclude_user =
+		extra & QUADD_PARAM_EXTRA_EXCLUDE_USER ? 1 : 0;
+	ctx.exclude_kernel =
+		extra & QUADD_PARAM_EXTRA_EXCLUDE_KERNEL ? 1 : 0;
+	ctx.exclude_hv =
+		extra & QUADD_PARAM_EXTRA_EXCLUDE_HV ? 1 : 0;
+	pr_info("exclude user/kernel/hv: %u/%u/%u\n",
+		ctx.exclude_user, ctx.exclude_kernel, ctx.exclude_hv);
+
 	uncore_freq = p->reserved[QUADD_PARAM_IDX_UNCORE_FREQ];
 	if (uncore_freq != 0 && !validate_freq(uncore_freq))
 		return -EINVAL;
@@ -366,17 +422,18 @@ set_parameters(struct quadd_parameters *p)
 		} else {
 			ctx.collect_kernel_ips = 1;
 		}
-
-		low_addr_p =
-			(u64 *)&p->reserved[QUADD_PARAM_IDX_BT_LOWER_BOUND];
-		ctx.hrt->low_addr = (unsigned long)*low_addr_p;
-
-		err = quadd_unwind_start(task);
-		if (err)
-			goto out_put_task;
 	}
 
-#if defined(CONFIG_ARCH_TEGRA_19x_SOC) || defined(CONFIG_ARCH_TEGRA_194_SOC)
+	low_addr_p =
+		(u64 *)&p->reserved[QUADD_PARAM_IDX_BT_LOWER_BOUND];
+	ctx.hrt->low_addr = (unsigned long)*low_addr_p;
+
+	err = quadd_unwind_start(task);
+	if (err)
+		goto out_put_task;
+
+#if defined(CONFIG_ARCH_TEGRA_19x_SOC) || defined(CONFIG_ARCH_TEGRA_194_SOC) || \
+    defined(CONFIG_ARCH_TEGRA_23x_SOC) || defined(CONFIG_ARCH_TEGRA_234_SOC)
 	nr = p->nr_events;
 
 	if (nr > QUADD_MAX_COUNTERS) {
@@ -384,6 +441,7 @@ set_parameters(struct quadd_parameters *p)
 		goto out_put_task;
 	}
 
+#if defined(CONFIG_ARCH_TEGRA_19x_SOC) || defined(CONFIG_ARCH_TEGRA_194_SOC)
 	if (ctx.carmel_pmu && is_carmel_events(p->events, nr)) {
 		if (!capable(CAP_SYS_ADMIN)) {
 			pr_err("error: Carmel PMU: allowed only for root\n");
@@ -396,16 +454,69 @@ set_parameters(struct quadd_parameters *p)
 			goto out_put_task;
 		}
 
-		err = ctx.carmel_pmu->set_events(-1, p->events, nr);
-		if (err) {
+		err = ctx.carmel_pmu->set_events(-1, p->events, nr, base_idx);
+		if (err < 0) {
 			pr_err("Carmel Uncore PMU set parameters: error\n");
 			ctx.carmel_pmu_info.active = 0;
 			goto out_put_task;
 		}
+		base_idx += err;
+		err = 0;
 		ctx.carmel_pmu_info.active = 1;
 	}
-#endif
+#endif /* CONFIG_ARCH_TEGRA_19x_SOC || defined(CONFIG_ARCH_TEGRA_194_SOC */
 
+#if defined(CONFIG_ARCH_TEGRA_23x_SOC) || defined(CONFIG_ARCH_TEGRA_234_SOC)
+	if (ctx.tegra23x_pmu_scf && is_tegra23x_pmu_scf_events(p->events, nr)) {
+		if (!capable(CAP_SYS_ADMIN)) {
+			pr_err("error: T23X PMU SCF: allowed only for root\n");
+			err = -EACCES;
+			goto out_put_task;
+		}
+
+		if (uncore_freq == 0) {
+			err = -EINVAL;
+			goto out_put_task;
+		}
+
+		err = ctx.tegra23x_pmu_scf->set_events(-1, p->events, nr, base_idx);
+		if (err < 0) {
+			pr_err("T23X Uncore PMU SCF set parameters: error\n");
+			ctx.tegra23x_pmu_scf_info.active = 0;
+			goto out_put_task;
+		}
+		base_idx += err;
+		err = 0;
+		ctx.tegra23x_pmu_scf_info.active = 1;
+	}
+
+#ifdef CONFIG_ARM_DSU_PMU
+	if (ctx.tegra23x_pmu_dsu && is_tegra23x_pmu_dsu_events(p->events, nr)) {
+		if (!capable(CAP_SYS_ADMIN)) {
+			pr_err("error: T23X PMU DSU: allowed only for root\n");
+			err = -EACCES;
+			goto out_put_task;
+		}
+
+		if (uncore_freq == 0) {
+			err = -EINVAL;
+			goto out_put_task;
+		}
+
+		err = ctx.tegra23x_pmu_dsu->set_events(-1, p->events, nr, base_idx);
+		if (err < 0) {
+			pr_err("T23X Uncore PMU DSU set parameters: error\n");
+			ctx.tegra23x_pmu_dsu_info.active = 0;
+			goto out_put_task;
+		}
+		base_idx += err;
+		err = 0;
+		ctx.tegra23x_pmu_dsu_info.active = 1;
+	}
+#endif /* CONFIG_ARM_DSU_PMU */
+#endif /* CONFIG_ARCH_TEGRA_23x_SOC || defined(CONFIG_ARCH_TEGRA_234_SOC */
+
+#endif
 	pr_info("New parameters have been applied\n");
 
 out_put_task:
@@ -630,7 +741,7 @@ static inline
 struct quadd_event_source *pmu_init(void)
 {
 #ifdef CONFIG_ARM64
-	return quadd_armv8_pmu_init();
+	return quadd_armv8_pmu_init(&ctx);
 #else
 	return quadd_armv7_pmu_init();
 #endif
@@ -647,7 +758,7 @@ static inline void pmu_deinit(void)
 
 int quadd_late_init(void)
 {
-	int i, nr_events, err;
+	int nr_events, nr_ctrs, err;
 	unsigned int raw_event_mask;
 	struct quadd_event *events;
 	struct source_info *pmu_info;
@@ -678,17 +789,11 @@ int quadd_late_init(void)
 			nr_events =
 				ctx.pmu->supported_events(cpuid, events,
 							  QUADD_MAX_COUNTERS,
-							  &raw_event_mask);
+							  &raw_event_mask, &nr_ctrs);
 
 			pmu_info->nr_supp_events = nr_events;
 			pmu_info->raw_event_mask = raw_event_mask;
-
-			pr_debug("CPU: %d PMU: events: %d, raw mask: %#x\n",
-				 cpuid, nr_events, raw_event_mask);
-
-			for (i = 0; i < nr_events; i++)
-				pr_debug("CPU: %d PMU event: %s\n", cpuid,
-					 quadd_get_hw_event_str(events[i].id));
+			pmu_info->nr_ctrs = nr_ctrs;
 		}
 	}
 
@@ -707,19 +812,68 @@ int quadd_late_init(void)
 		nr_events =
 			ctx.carmel_pmu->supported_events(0, events,
 							 QUADD_MAX_COUNTERS,
-							 &raw_event_mask);
+							 &raw_event_mask, &nr_ctrs);
 
 		pmu_info->is_present = 1;
 		pmu_info->nr_supp_events = nr_events;
 		pmu_info->raw_event_mask = raw_event_mask;
+		pmu_info->nr_ctrs = nr_ctrs;
 	}
 #endif
+
+#if defined(CONFIG_ARCH_TEGRA_23x_SOC) || defined(CONFIG_ARCH_TEGRA_234_SOC)
+	ctx.tegra23x_pmu_scf = quadd_tegra23x_pmu_scf_init();
+	if (IS_ERR(ctx.tegra23x_pmu_scf)) {
+		pr_err("T23X Uncore PMU SCF init failed\n");
+		err = PTR_ERR(ctx.tegra23x_pmu_scf);
+		goto out_err_pmu;
+	}
+
+	if (ctx.tegra23x_pmu_scf) {
+		pmu_info = &ctx.tegra23x_pmu_scf_info;
+		events = pmu_info->supp_events;
+
+		nr_events =
+			ctx.tegra23x_pmu_scf->supported_events(0, events,
+							QUADD_MAX_COUNTERS,
+							&raw_event_mask, &nr_ctrs);
+
+		pmu_info->is_present = 1;
+		pmu_info->nr_supp_events = nr_events;
+		pmu_info->raw_event_mask = raw_event_mask;
+		pmu_info->nr_ctrs = nr_ctrs;
+	}
+
+#ifdef CONFIG_ARM_DSU_PMU
+	ctx.tegra23x_pmu_dsu = quadd_tegra23x_pmu_dsu_init();
+	if (IS_ERR(ctx.tegra23x_pmu_dsu)) {
+		pr_err("T23X Uncore PMU DSU init failed\n");
+		err = PTR_ERR(ctx.tegra23x_pmu_dsu);
+		goto out_err_uncore_pmu_scf;
+	}
+
+	if (ctx.tegra23x_pmu_dsu) {
+		pmu_info = &ctx.tegra23x_pmu_dsu_info;
+		events = pmu_info->supp_events;
+
+		nr_events =
+			ctx.tegra23x_pmu_dsu->supported_events(0, events,
+							QUADD_MAX_COUNTERS,
+							&raw_event_mask, &nr_ctrs);
+
+		pmu_info->is_present = 1;
+		pmu_info->nr_supp_events = nr_events;
+		pmu_info->raw_event_mask = raw_event_mask;
+		pmu_info->nr_ctrs = nr_ctrs;
+	}
+#endif /* CONFIG_ARM_DSU_PMU */
+#endif /* CONFIG_ARCH_TEGRA_23x_SOC || CONFIG_ARCH_TEGRA_234_SOC */
 
 	ctx.hrt = quadd_hrt_init(&ctx);
 	if (IS_ERR(ctx.hrt)) {
 		pr_err("error: HRT init failed\n");
 		err = PTR_ERR(ctx.hrt);
-		goto out_err_carmel_pmu;
+		goto out_err_uncore_pmu;
 	}
 
 	err = quadd_uncore_init(&ctx);
@@ -755,11 +909,20 @@ out_err_uncore:
 	quadd_uncore_deinit();
 out_err_hrt:
 	quadd_hrt_deinit();
-out_err_carmel_pmu:
+
+out_err_uncore_pmu:
 #if defined(CONFIG_ARCH_TEGRA_19x_SOC) || defined(CONFIG_ARCH_TEGRA_194_SOC)
 	quadd_carmel_uncore_pmu_deinit();
-out_err_pmu:
 #endif
+#if defined(CONFIG_ARCH_TEGRA_23x_SOC) || defined(CONFIG_ARCH_TEGRA_234_SOC)
+#ifdef CONFIG_ARM_DSU_PMU
+	quadd_tegra23x_pmu_dsu_deinit();
+out_err_uncore_pmu_scf:
+#endif /* CONFIG_ARM_DSU_PMU */
+	quadd_tegra23x_pmu_scf_deinit();
+#endif /* CONFIG_ARCH_TEGRA_23x_SOC || CONFIG_ARCH_TEGRA_234_SOC */
+
+out_err_pmu:
 	pmu_deinit();
 
 	return err;

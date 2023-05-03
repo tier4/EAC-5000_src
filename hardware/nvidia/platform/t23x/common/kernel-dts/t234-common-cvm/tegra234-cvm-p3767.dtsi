@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -24,6 +24,7 @@
 #include "tegra234-p3767-powermon.dtsi"
 #include "tegra234-p3767-fixed-regulator.dtsi"
 #include "tegra234-p3767-power-tree.dtsi"
+#include <t234-common-cvm/tegra234-platforms-vrs.dtsi>
 #include "tegra234-thermal.dtsi"
 
 / {
@@ -54,21 +55,19 @@
 
 	cpufreq {
 		compatible = "nvidia,t234-cpufreq";
+		status = "disabled";
+	};
+
+	ccplex@e000000 {
+		compatible = "nvidia,tegra234-ccplex-cluster";
 		status = "okay";
 		cpu_emc_map = <1907200 1600000>,
 			    <1881600 800000>,
 			    <1574400 665000>,
-			    <1267200 408000>;
+			    <1267200 408000>,
+			    <115200 204000>;
 	};
-#if defined(LINUX_VERSION) && LINUX_VERSION > 414
-	ccplex {
-		compatible = "nvidia,t234-ccplex";
-		cpu_emc_map = <1907200 1600000>,
-			    <1881600 800000>,
-			    <1574400 665000>,
-			    <1267200 408000>;
-	};
-#endif
+
 	pmc@c370000 {
 		nvidia,invert-interrupt;
 	};
@@ -163,78 +162,6 @@
 
 	thermal-zones {
 		status = "disabled";
-		CPU-therm {
-			cooling-maps {
-				map0 {
-					cooling-device = <&cl0_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&cl1_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&tegra_ga10b THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
-		};
-		GPU-therm {
-			cooling-maps {
-				map0 {
-					cooling-device = <&cl0_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&cl1_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&tegra_ga10b THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
-		};
-		CV0-therm {
-			cooling-maps {
-				map0 {
-					cooling-device = <&cl0_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&cl1_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&tegra_ga10b THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
-		};
-		CV1-therm {
-			cooling-maps {
-				map0 {
-					cooling-device = <&cl0_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&cl1_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&tegra_ga10b THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
-		};
-		CV2-therm {
-			cooling-maps {
-				map0 {
-					cooling-device = <&cl0_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&cl1_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&tegra_ga10b THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
-		};
-		SOC0-therm {
-			cooling-maps {
-				map0 {
-					cooling-device = <&cl0_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&cl1_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&tegra_ga10b THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
-		};
-		SOC1-therm {
-			cooling-maps {
-				map0 {
-					cooling-device = <&cl0_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&cl1_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&tegra_ga10b THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
-		};
-		SOC2-therm {
-			cooling-maps {
-				map0 {
-					cooling-device = <&cl0_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&cl1_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-							 <&tegra_ga10b THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
-		};
 
 		Tboard_tegra {
 			/* There is no external temp sensor */
@@ -257,11 +184,17 @@
 			status = "okay";
 		};
 		linux,cma {
+			size = <0x0 0x10000000>; /* 256 MB */
 			status = "okay";
 		};
 		vpr-carveout {
 			status = "disabled";
 		};
+	};
+
+	tegra-carveouts {
+		memory-region = <&vpr>;
+		status = "okay";
 	};
 
 	tegra-cache {
@@ -280,6 +213,10 @@
 		status = "okay";
 		/delete-property/ ranges;
 		/delete-node/ mssnvlink@1f20000;
+	};
+
+	mc-hwpm {
+		status = "okay";
 	};
 
 	mc_sid@2c00000 {
@@ -337,8 +274,12 @@
 		};
 	};
 
+	nvpmodel {
+		status = "okay";
+	};
+
 	soctherm-oc-event {
-		status = "disabled";
+		status = "okay";
 	};
 
 	display@13800000 {

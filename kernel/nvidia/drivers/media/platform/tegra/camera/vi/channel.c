@@ -1,13 +1,18 @@
-/*
- * NVIDIA Tegra Video Input Device
- *
- * Copyright (c) 2015-2022, NVIDIA CORPORATION.  All rights reserved.
- *
+/* NVIDIA Tegra Video Input Device
  * Author: Bryan Wu <pengw@nvidia.com>
+ * Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <linux/atomic.h>
@@ -52,6 +57,8 @@
 
 #define TPG_CSI_GROUP_ID	10
 #define HDMI_IN_RATE 550000000
+/* number of lanes per brick */
+#define NUM_LANES_PER_BRICK	4
 
 static s64 queue_init_ts;
 
@@ -200,16 +207,10 @@ static void tegra_channel_fmt_align(struct tegra_channel *chan,
 	/* Align stride */
 	if (chan->vi->fops->vi_stride_align)
 		chan->vi->fops->vi_stride_align(&bpl);
-#ifdef CONFIG_VIDEO_ECAM
-	/* Always update bytesperline value,if not it is causing streaming problem
-	 * in some supported resolutions which have stride length not divisible by
-	 * default RM_SURFACE_ALIGNMENT
-	 */
-	*bytesperline = bpl;
-#else
+
 	if (!*bytesperline)
 		*bytesperline = bpl;
-#endif
+
 	/* Don't clamp the width based on bpl as stride and width can be
 	 * different. Aligned width also may force a sensor mode change other
 	 * than the requested one
@@ -606,10 +607,6 @@ void tegra_channel_ring_buffer(struct tegra_channel *chan,
 	} else {
 		/* TODO: granular time code information */
 		vb->timecode.seconds = ts->tv_sec;
-#ifdef CONFIG_VIDEO_ECAM
-		/* update time stamp of the buffer :  We are using this time stamp for synchronization*/
-		vb->vb2_buf.timestamp = timespec64_to_ns(ts);
-#endif
 	}
 
 	/* release buffer N at N+2 frame start event */
@@ -1257,6 +1254,11 @@ int tegra_channel_s_ctrl(struct v4l2_ctrl *ctrl)
 				struct tegra_channel, ctrl_handler);
 	int err = 0;
 
+	/* Check device is busy or not, While setting bypass mode*/
+	if (vb2_is_busy(&chan->queue) && (TEGRA_CAMERA_CID_VI_BYPASS_MODE == ctrl->id)) {
+		return -EBUSY;
+	}
+
 	switch (ctrl->id) {
 	case TEGRA_CAMERA_CID_GAIN_TPG:
 		{
@@ -1769,10 +1771,11 @@ static int map_to_sensor_type(u32 phy_mode)
 	}
 }
 
-static u64 tegra_channel_get_max_pixelclock(struct tegra_channel *chan)
+static void tegra_channel_get_sensor_peak_vals(struct tegra_channel *chan,
+						u64 *pixelclock, u32 *num_lanes)
 {
 	int i = 0;
-	u64 val = 0, pixelclock = 0;
+	u64 val = 0;
 
 	struct v4l2_subdev *sd = chan->subdev_on_csi;
 	struct camera_common_data *s_data =
@@ -1780,7 +1783,7 @@ static u64 tegra_channel_get_max_pixelclock(struct tegra_channel *chan)
 	struct sensor_mode_properties *sensor_mode;
 
 	if (!s_data)
-		return 0;
+		return;
 
 	for (i = 0; i < s_data->sensor_props.num_modes; i++) {
 		sensor_mode = &s_data->sensor_props.sensor_modes[i];
@@ -1788,20 +1791,23 @@ static u64 tegra_channel_get_max_pixelclock(struct tegra_channel *chan)
 			val = sensor_mode->signal_properties.serdes_pixel_clock.val;
 		else
 			val = sensor_mode->signal_properties.pixel_clock.val;
-		/* Select the mode with largest pixel rate */
-		if (pixelclock < val)
-			pixelclock = val;
+
+		/* Select the value from the mode with largest pixel rate and lane numbers */
+		if (*pixelclock < val)
+			*pixelclock = val;
+
+		if (*num_lanes < sensor_mode->signal_properties.num_lanes)
+			*num_lanes = sensor_mode->signal_properties.num_lanes;
 	}
 	spec_bar();
-
-	return pixelclock;
 }
+
 
 static u32 tegra_channel_get_num_lanes(struct tegra_channel *chan)
 {
 	u32 num_lanes = 0;
-
 	struct v4l2_subdev *sd = chan->subdev_on_csi;
+
 	struct camera_common_data *s_data =
 		to_camera_common_data(sd->dev);
 	struct sensor_mode_properties *sensor_mode;
@@ -1847,13 +1853,14 @@ static void tegra_channel_populate_dev_info(struct tegra_camera_dev_info *cdev,
 			struct tegra_channel *chan)
 {
 	u64 pixelclock = 0;
+	u32 max_num_lanes = 0;
 	struct camera_common_data *s_data =
 			to_camera_common_data(chan->subdev_on_csi->dev);
 
 	if (s_data != NULL) {
 		/* camera sensors */
 		cdev->sensor_type = tegra_channel_get_sensor_type(chan);
-		pixelclock = tegra_channel_get_max_pixelclock(chan);
+		tegra_channel_get_sensor_peak_vals(chan, &pixelclock, &max_num_lanes);
 		/* Multiply by CPHY symbols to pixels factor. */
 		if (cdev->sensor_type == SENSORTYPE_CPHY)
 			pixelclock *= 16/7;
@@ -1872,8 +1879,14 @@ static void tegra_channel_populate_dev_info(struct tegra_camera_dev_info *cdev,
 			return;
 		}
 	}
-
-	cdev->pixel_rate = pixelclock;
+	/*
+	 * VI clk scaling for gang mode usecase where 2 CSI bricks
+	 * stream through a single VI channel.
+	 */
+	if (max_num_lanes > NUM_LANES_PER_BRICK)
+		cdev->pixel_rate = pixelclock * (max_num_lanes / NUM_LANES_PER_BRICK);
+	else
+		cdev->pixel_rate = pixelclock;
 	cdev->pixel_bit_depth = chan->fmtinfo->width;
 	cdev->bpp = chan->fmtinfo->bpp.numerator;
 	/* BW in kBps */
@@ -2224,27 +2237,6 @@ static long tegra_channel_default_ioctl(struct file *file, void *fh,
 	return ret;
 }
 
-#ifdef CONFIG_VIDEO_ECAM
-/* Implemented vidioc_s_parm and vidioc_g_parm ioctl for v4l2-compliance test */
-static int tegra_channel_s_parm(struct file *file, void *fh,
-               struct v4l2_streamparm *a)
-{
-	struct tegra_channel *chan = video_drvdata(file);
-	struct v4l2_subdev *sd = chan->subdev_on_csi;
-
-	return v4l2_subdev_call(sd, video, s_parm, a);
-}
-
-static int tegra_channel_g_parm(struct file *file, void *fh,
-               struct v4l2_streamparm *a)
-{
-	struct tegra_channel *chan = video_drvdata(file);
-	struct v4l2_subdev *sd = chan->subdev_on_csi;
-
-	return v4l2_subdev_call(sd, video, g_parm, a);
-}
-#endif
-
 #ifdef CONFIG_COMPAT
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 static long tegra_channel_compat_ioctl(struct file *filp,
@@ -2301,11 +2293,6 @@ static const struct v4l2_ioctl_ops tegra_channel_ioctl_ops = {
 	.vidioc_s_input			= tegra_channel_s_input,
 	.vidioc_log_status		= tegra_channel_log_status,
 	.vidioc_default			= tegra_channel_default_ioctl,
-#ifdef CONFIG_VIDEO_ECAM
-/* Implemented vidioc_s_parm and vidioc_g_parm ioctl for v4l2-compliance test */
-	.vidioc_s_parm                  = tegra_channel_s_parm,
-	.vidioc_g_parm                  = tegra_channel_g_parm,
-#endif
 };
 
 static int tegra_channel_close(struct file *fp);

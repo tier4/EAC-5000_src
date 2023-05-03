@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021, NVIDIA Corporation.
+ * Copyright (c) 2021-2022, NVIDIA Corporation.
  */
 
 #include <linux/clk.h>
@@ -19,7 +19,10 @@
 
 #include "drm.h"
 #include "falcon.h"
+#include "util.h"
 #include "vic.h"
+
+#define NVENC_TFBIF_TRANSCFG		0x1844
 
 struct nvenc_config {
 	const char *firmware;
@@ -46,33 +49,17 @@ static inline struct nvenc *to_nvenc(struct tegra_drm_client *client)
 	return container_of(client, struct nvenc, client);
 }
 
-static void nvenc_writel(struct nvenc *nvenc, u32 value, unsigned int offset)
+static inline void nvenc_writel(struct nvenc *nvenc, u32 value, unsigned int offset)
 {
 	writel(value, nvenc->regs + offset);
 }
 
 static int nvenc_boot(struct nvenc *nvenc)
 {
-#ifdef CONFIG_IOMMU_API
-	struct iommu_fwspec *spec = dev_iommu_fwspec_get(nvenc->dev);
-#endif
 	int err;
 
-#ifdef CONFIG_IOMMU_API
-	if (nvenc->config->supports_sid && spec) {
-		u32 value;
-
-		value = TRANSCFG_ATT(1, TRANSCFG_SID_FALCON) | TRANSCFG_ATT(0, TRANSCFG_SID_HW);
-		nvenc_writel(nvenc, value, VIC_TFBIF_TRANSCFG);
-
-		if (spec->num_ids > 0) {
-			value = spec->ids[0] & 0xffff;
-
-			nvenc_writel(nvenc, value, VIC_THI_STREAMID0);
-			nvenc_writel(nvenc, value, VIC_THI_STREAMID1);
-		}
-	}
-#endif
+	if (nvenc->config->supports_sid)
+		tegra_drm_program_iommu_regs(nvenc->dev, nvenc->regs, NVENC_TFBIF_TRANSCFG);
 
 	err = falcon_boot(&nvenc->falcon);
 	if (err < 0)
@@ -113,9 +100,13 @@ static int nvenc_init(struct host1x_client *client)
 		goto free_channel;
 	}
 
+	pm_runtime_enable(client->dev);
+	pm_runtime_use_autosuspend(client->dev);
+	pm_runtime_set_autosuspend_delay(client->dev, 500);
+
 	err = tegra_drm_register_client(tegra, drm);
 	if (err < 0)
-		goto free_syncpt;
+		goto disable_rpm;
 
 	/*
 	 * Inherit the DMA parameters (such as maximum segment size) from the
@@ -125,7 +116,9 @@ static int nvenc_init(struct host1x_client *client)
 
 	return 0;
 
-free_syncpt:
+disable_rpm:
+	pm_runtime_dont_use_autosuspend(client->dev);
+	pm_runtime_force_suspend(client->dev);
 	host1x_syncpt_put(client->syncpts[0]);
 free_channel:
 	host1x_channel_put(nvenc->channel);
@@ -150,9 +143,14 @@ static int nvenc_exit(struct host1x_client *client)
 	if (err < 0)
 		return err;
 
+	pm_runtime_dont_use_autosuspend(client->dev);
+	pm_runtime_force_suspend(client->dev);
+
 	host1x_syncpt_put(client->syncpts[0]);
 	host1x_channel_put(nvenc->channel);
 	host1x_client_iommu_detach(client);
+
+	nvenc->channel = NULL;
 
 	if (client->group) {
 		dma_unmap_single(nvenc->dev, nvenc->falcon.firmware.phys,
@@ -238,7 +236,7 @@ cleanup:
 }
 
 
-static int nvenc_runtime_resume(struct device *dev)
+static __maybe_unused int nvenc_runtime_resume(struct device *dev)
 {
 	struct nvenc *nvenc = dev_get_drvdata(dev);
 	int err;
@@ -264,9 +262,11 @@ disable:
 	return err;
 }
 
-static int nvenc_runtime_suspend(struct device *dev)
+static __maybe_unused int nvenc_runtime_suspend(struct device *dev)
 {
 	struct nvenc *nvenc = dev_get_drvdata(dev);
+
+	host1x_channel_stop(nvenc->channel);
 
 	clk_disable_unprepare(nvenc->clk);
 
@@ -302,10 +302,19 @@ static void nvenc_close_channel(struct tegra_drm_context *context)
 	pm_runtime_put(nvenc->dev);
 }
 
+static int nvenc_can_use_memory_ctx(struct tegra_drm_client *client, bool *supported)
+{
+	*supported = true;
+
+	return 0;
+}
+
 static const struct tegra_drm_client_ops nvenc_ops = {
 	.open_channel = nvenc_open_channel,
 	.close_channel = nvenc_close_channel,
 	.submit = tegra_drm_submit,
+	.get_streamid_offset = tegra_drm_get_streamid_offset_thi,
+	.can_use_memory_ctx = nvenc_can_use_memory_ctx,
 };
 
 #define NVIDIA_TEGRA_210_NVENC_FIRMWARE "nvidia/tegra210/nvenc.bin"
@@ -335,10 +344,20 @@ static const struct nvenc_config nvenc_t194_config = {
 	.num_instances = 2,
 };
 
+#define NVIDIA_TEGRA_234_NVENC_FIRMWARE "nvidia/tegra234/nvenc.bin"
+
+static const struct nvenc_config nvenc_t234_config = {
+	.firmware = NVIDIA_TEGRA_234_NVENC_FIRMWARE,
+	.version = 0x23,
+	.supports_sid = true,
+	.num_instances = 1,
+};
+
 static const struct of_device_id tegra_nvenc_of_match[] = {
 	{ .compatible = "nvidia,tegra210-nvenc", .data = &nvenc_t210_config },
 	{ .compatible = "nvidia,tegra186-nvenc", .data = &nvenc_t186_config },
 	{ .compatible = "nvidia,tegra194-nvenc", .data = &nvenc_t194_config },
+	{ .compatible = "nvidia,tegra234-nvenc", .data = &nvenc_t234_config },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, tegra_nvenc_of_match);
@@ -416,10 +435,6 @@ static int nvenc_probe(struct platform_device *pdev)
 		goto exit_falcon;
 	}
 
-	pm_runtime_enable(&pdev->dev);
-	pm_runtime_set_autosuspend_delay(&pdev->dev, 500);
-	pm_runtime_use_autosuspend(&pdev->dev);
-
 	return 0;
 
 exit_falcon:
@@ -440,11 +455,6 @@ static int nvenc_remove(struct platform_device *pdev)
 		return err;
 	}
 
-	if (pm_runtime_enabled(&pdev->dev))
-		pm_runtime_disable(&pdev->dev);
-	else
-		nvenc_runtime_suspend(&pdev->dev);
-
 	falcon_exit(&nvenc->falcon);
 
 	return 0;
@@ -452,6 +462,8 @@ static int nvenc_remove(struct platform_device *pdev)
 
 static const struct dev_pm_ops nvenc_pm_ops = {
 	SET_RUNTIME_PM_OPS(nvenc_runtime_suspend, nvenc_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+				pm_runtime_force_resume)
 };
 
 struct platform_driver tegra_nvenc_driver = {
@@ -472,4 +484,7 @@ MODULE_FIRMWARE(NVIDIA_TEGRA_186_NVENC_FIRMWARE);
 #endif
 #if IS_ENABLED(CONFIG_ARCH_TEGRA_194_SOC)
 MODULE_FIRMWARE(NVIDIA_TEGRA_194_NVENC_FIRMWARE);
+#endif
+#if IS_ENABLED(CONFIG_ARCH_TEGRA_234_SOC)
+MODULE_FIRMWARE(NVIDIA_TEGRA_234_NVENC_FIRMWARE);
 #endif

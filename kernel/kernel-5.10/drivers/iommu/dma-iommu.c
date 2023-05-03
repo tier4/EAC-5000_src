@@ -87,7 +87,7 @@ int iommu_get_dma_cookie(struct iommu_domain *domain)
 	if (!domain->iova_cookie)
 		return -ENOMEM;
 
-	mutex_init(&((struct iommu_dma_cookie*)(domain->iova_cookie))->mutex);
+	mutex_init(&((struct iommu_dma_cookie *)(domain->iova_cookie))->mutex);
 	return 0;
 }
 EXPORT_SYMBOL(iommu_get_dma_cookie);

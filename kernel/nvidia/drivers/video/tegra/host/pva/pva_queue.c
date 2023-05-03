@@ -44,6 +44,9 @@
 #endif
 
 #include <linux/seq_file.h>
+#include <uapi/linux/nvpva_ioctl.h>
+#include <trace/events/nvhost_pva.h>
+
 #include "pva.h"
 #include "nvpva_buffer.h"
 #include "nvpva_queue.h"
@@ -55,11 +58,9 @@
 #include "pva-interface.h"
 #include "pva_vpu_exe.h"
 #include "nvpva_client.h"
+#include "nvpva_syncpt.h"
 
-#include <uapi/linux/nvpva_ioctl.h>
-#include <trace/events/nvhost_pva.h>
-
-static void *pva_dmabuf_vmap(struct dma_buf *dmabuf)
+void *pva_dmabuf_vmap(struct dma_buf *dmabuf)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
@@ -78,7 +79,7 @@ static void *pva_dmabuf_vmap(struct dma_buf *dmabuf)
 #endif
 }
 
-static void pva_dmabuf_vunmap(struct dma_buf *dmabuf, void *addr)
+void pva_dmabuf_vunmap(struct dma_buf *dmabuf, void *addr)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
@@ -153,7 +154,6 @@ static void pva_task_unpin_mem(struct pva_submit_task *task)
 	}
 
 	task->num_pinned = 0;
-	task->pinned_hwseq_config = false;
 }
 
 struct pva_pinned_memory *pva_task_pin_mem(struct pva_submit_task *task,
@@ -212,14 +212,20 @@ static int pva_task_pin_fence(struct pva_submit_task *task,
 		break;
 	}
 	case NVPVA_FENCE_OBJ_SYNCPT: {
-		dma_addr_t syncpt_addr = nvhost_syncpt_address(
-				task->queue->vm_pdev, fence->obj.syncpt.id);
-		if (syncpt_addr)
+		dma_addr_t syncpt_addr = nvpva_syncpt_address(
+				task->queue->vm_pdev, fence->obj.syncpt.id,
+				false);
+		nvpva_dbg_info(task->pva,
+			       "id = %d, syncpt addr = %llx",
+			       fence->obj.syncpt.id,
+			       syncpt_addr);
+
+		if (syncpt_addr) {
 			*addr = syncpt_addr;
-		else {
-			task_err(
-				task,
-				"%s: can't get syncpoint address", __func__);
+		} else {
+			task_err(task,
+				"%s: can't get syncpoint address",
+				__func__);
 			err = -EINVAL;
 		}
 		break;
@@ -289,6 +295,7 @@ static int pva_task_process_fence_actions(struct pva_submit_task *task,
 	int err = 0;
 	u32 i;
 	u32 fence_type;
+	u32 ts_flag = 0;
 	u8 *action_counter;
 	u8 action_code;
 	struct pva_task_action_s *fw_actions;
@@ -301,26 +308,31 @@ static int pva_task_process_fence_actions(struct pva_submit_task *task,
 			fw_actions = &hw_task->preactions[0];
 			action_code = TASK_ACT_PTR_WRITE_SOT_R;
 			action_counter = &hw_task->task.num_preactions;
+			ts_flag = PVA_TASK_FL_SOT_R_TS;
 			break;
 		case NVPVA_FENCE_SOT_VPU:
 			fw_actions = &hw_task->preactions[0];
 			action_code = TASK_ACT_PTR_WRITE_SOT_V;
 			action_counter = &hw_task->task.num_preactions;
+			ts_flag = PVA_TASK_FL_SOT_V_TS;
 			break;
 		case NVPVA_FENCE_EOT_R5:
 			fw_actions = &hw_task->postactions[0];
 			action_code = TASK_ACT_PTR_WRITE_EOT_R;
 			action_counter = &hw_task->task.num_postactions;
+			ts_flag = PVA_TASK_FL_EOT_R_TS;
 			break;
 		case NVPVA_FENCE_EOT_VPU:
 			fw_actions = &hw_task->postactions[0];
 			action_code = TASK_ACT_PTR_WRITE_EOT_V;
 			action_counter = &hw_task->task.num_postactions;
+			ts_flag = PVA_TASK_FL_EOT_V_TS;
 			break;
 		case NVPVA_FENCE_POST:
 			fw_actions = &hw_task->postactions[0];
 			action_code = TASK_ACT_PTR_WRITE_EOT;
 			action_counter = &hw_task->task.num_postactions;
+			ts_flag = 0;
 			break;
 		default:
 			task_err(task, "unknown fence action type");
@@ -331,7 +343,7 @@ static int pva_task_process_fence_actions(struct pva_submit_task *task,
 		for (i = 0; i < task->num_pva_fence_actions[fence_type]; i++) {
 			struct nvpva_fence_action *fence_action =
 			    &task->pva_fence_actions[fence_type][i];
-			dma_addr_t fence_addr;
+			dma_addr_t fence_addr = 0;
 			u32 fence_value;
 			dma_addr_t timestamp_addr;
 			switch (fence_action->fence.type) {
@@ -339,8 +351,13 @@ static int pva_task_process_fence_actions(struct pva_submit_task *task,
 			{
 				u32 id = task->queue->syncpt_id;
 				fence_action->fence.obj.syncpt.id = id;
-				fence_addr = nvhost_syncpt_address(
-				    task->queue->vm_pdev, id);
+				fence_addr = nvpva_syncpt_address(
+				    task->queue->vm_pdev, id, true);
+				nvpva_dbg_info(task->pva,
+					       "id = %d, fence_addr = %llx ",
+					       task->queue->syncpt_id,
+					       fence_addr);
+
 				if (fence_addr == 0) {
 					err = -EFAULT;
 					goto out;
@@ -387,9 +404,11 @@ static int pva_task_process_fence_actions(struct pva_submit_task *task,
 				timestamp_addr =
 				    mem->dma_addr +
 				    fence_action->timestamp_buf.offset;
+				hw_task->task.flags |= ts_flag;
 			} else {
 				timestamp_addr = 0;
 			}
+
 			current_fw_actions = &fw_actions[*action_counter];
 			pva_task_write_fence_action_op(current_fw_actions,
 						       action_code, fence_addr,
@@ -409,18 +428,22 @@ static int pva_task_process_prefences(struct pva_submit_task *task,
 	struct pva_task_action_s *fw_preactions = NULL;
 	for (i = 0; i < task->num_prefences; i++) {
 		struct nvpva_submit_fence *fence = &task->prefences[i];
-		dma_addr_t fence_addr;
+		dma_addr_t fence_addr = 0;
 		u32 fence_val;
+
 		err = pva_task_pin_fence(task, fence, &fence_addr);
 		if (err)
 			goto out;
+
 		if (fence_addr == 0) {
 			err = -EINVAL;
 			goto out;
 		}
+
 		err = get_fence_value(fence, &fence_val);
 		if (err)
 			goto out;
+
 		fw_preactions =
 			&hw_task->preactions[hw_task->task.num_preactions];
 		pva_task_write_fence_action_op(fw_preactions,
@@ -487,12 +510,17 @@ static int pva_task_process_output_status(struct pva_submit_task *task,
 						1U /* PVA task error code */);
 		++hw_task->task.num_postactions;
 	}
+
 	stats_addr = task->dma_addr + offsetof(struct pva_hw_task, statistics);
 	fw_postactions = &hw_task->postactions[hw_task->task.num_postactions];
-	pva_task_write_stats_action_op(fw_postactions,
-				       (uint8_t)TASK_ACT_PVA_STATISTICS,
-				       stats_addr);
-	++hw_task->task.num_postactions;
+	if ((task->pva->stats_enabled)
+	  || (task->pva->profiling_level > 0)) {
+		pva_task_write_stats_action_op(fw_postactions,
+					       (uint8_t)TASK_ACT_PVA_STATISTICS,
+					       stats_addr);
+		hw_task->task.flags |= PVA_TASK_FL_STATS_ENABLE;
+		++hw_task->task.num_postactions;
+	}
 
 out:
 	return err;
@@ -637,7 +665,6 @@ static int pva_task_write_vpu_parameter(struct pva_submit_task *task,
 
 	hw_task->task.num_parameters = task->num_symbols;
 
-	hw_task->task.parameter_base = 0UL;
 	hw_task->task.parameter_info_base = task->dma_addr
 					    + offsetof(struct pva_hw_task, param_info);
 
@@ -801,7 +828,7 @@ pva_eventlib_record_r5_states(struct platform_device *pdev,
 	struct nvdev_fence post_fence;
 	struct nvpva_submit_fence *fence;
 
-	if (!pdata->eventlib_id)
+	if ((task->pva->profiling_level == 0) || (!pdata->eventlib_id))
 		return;
 
 	/* Record task postfences */
@@ -825,30 +852,6 @@ pva_eventlib_record_r5_states(struct platform_device *pdev,
 	keventlib_write(pdata->eventlib_id,
 			&state,
 			sizeof(state),
-			NVHOST_PVA_QUEUE_BEGIN,
-			stats->queued_time);
-
-	keventlib_write(pdata->eventlib_id,
-			&state,
-			sizeof(state),
-			NVHOST_PVA_QUEUE_END,
-			stats->vpu_assigned_time);
-
-	keventlib_write(pdata->eventlib_id,
-			&state,
-			sizeof(state),
-			NVHOST_PVA_PREPARE_BEGIN,
-			stats->vpu_assigned_time);
-
-	keventlib_write(pdata->eventlib_id,
-			&state,
-			sizeof(state),
-			NVHOST_PVA_PREPARE_END,
-			stats->vpu_start_time);
-
-	keventlib_write(pdata->eventlib_id,
-			&state,
-			sizeof(state),
 			stats->vpu_assigned == 0 ? NVHOST_PVA_VPU0_BEGIN
 						 : NVHOST_PVA_VPU1_BEGIN,
 			stats->vpu_start_time);
@@ -859,18 +862,42 @@ pva_eventlib_record_r5_states(struct platform_device *pdev,
 			stats->vpu_assigned == 0 ? NVHOST_PVA_VPU0_END
 						 : NVHOST_PVA_VPU1_END,
 			stats->vpu_complete_time);
-
+	keventlib_write(pdata->eventlib_id,
+			&state,
+			sizeof(state),
+			NVHOST_PVA_PREPARE_END,
+			stats->vpu_start_time);
 	keventlib_write(pdata->eventlib_id,
 			&state,
 			sizeof(state),
 			NVHOST_PVA_POST_BEGIN,
 			stats->vpu_complete_time);
 
-	keventlib_write(pdata->eventlib_id,
-			&state,
-			sizeof(state),
-			NVHOST_PVA_POST_END,
-			stats->complete_time);
+	if (task->pva->profiling_level >= 2) {
+		keventlib_write(pdata->eventlib_id,
+				&state,
+				sizeof(state),
+				NVHOST_PVA_QUEUE_BEGIN,
+				stats->queued_time);
+
+		keventlib_write(pdata->eventlib_id,
+				&state,
+				sizeof(state),
+				NVHOST_PVA_QUEUE_END,
+				stats->vpu_assigned_time);
+
+		keventlib_write(pdata->eventlib_id,
+				&state,
+				sizeof(state),
+				NVHOST_PVA_PREPARE_BEGIN,
+				stats->vpu_assigned_time);
+
+		keventlib_write(pdata->eventlib_id,
+				&state,
+				sizeof(state),
+				NVHOST_PVA_POST_END,
+				stats->complete_time);
+	}
 }
 #else
 static void
@@ -893,6 +920,15 @@ void pva_task_free(struct kref *ref)
 	struct pva_submit_task *task =
 	    container_of(ref, struct pva_submit_task, ref);
 	struct nvpva_queue *my_queue = task->queue;
+
+	mutex_lock(&my_queue->tail_lock);
+	if (my_queue->hw_task_tail == task->va)
+		my_queue->hw_task_tail = NULL;
+
+	if (my_queue->old_tail == task->va)
+		my_queue->old_tail = NULL;
+
+	mutex_unlock(&my_queue->tail_lock);
 
 	pva_task_unpin_mem(task);
 	if (task->pinned_app)
@@ -919,6 +955,8 @@ static void update_one_task(struct pva *pva)
 	u64 vpu_time = 0u;
 	u64 r5_overhead = 0u;
 	const u32 tsc_ticks_to_us = 31;
+	u32 vpu_assigned = 0;
+
 	nvpva_fetch_task_status_info(pva, &task_info);
 	WARN_ON(!task_info.valid);
 	WARN_ON(task_info.queue >= MAX_PVA_QUEUE_COUNT);
@@ -951,9 +989,44 @@ static void update_one_task(struct pva *pva)
 
 	WARN_ON(task_info.error == PVA_ERR_BAD_TASK ||
 		task_info.error == PVA_ERR_BAD_TASK_ACTION_LIST);
-	hw_task = task->va;
+	hw_task = (struct pva_hw_task *)task->va;
 	stats = &hw_task->statistics;
+	if (!task->pva->stats_enabled)
+		goto prof;
+
+	vpu_assigned = (stats->vpu_assigned & 0x1);
 	vpu_time = (stats->vpu_complete_time - stats->vpu_start_time);
+	mutex_lock(&pva->vpu_util_info.util_info_mutex);
+
+	/* update stats for assigned VPU */
+	pva->vpu_util_info.vpu_stats_accum[vpu_assigned] += vpu_time;
+	pva->vpu_util_info.current_stamp[vpu_assigned] = stats->vpu_complete_time;
+	pva->vpu_util_info.last_start[vpu_assigned] = stats->vpu_start_time;
+
+	/* check if need to wake up stats thread */
+	if (pva->vpu_util_info.flags & (1U << vpu_assigned)) {
+		if ((stats->vpu_complete_time >= pva->vpu_util_info.end_stamp)
+		|| (stats->vpu_start_time >=  pva->vpu_util_info.end_stamp)) {
+			pva->vpu_util_info.flags ^= (1U << vpu_assigned);
+
+			/* take a snap shot of counters */
+			pva->vpu_util_info_cp.vpu_stats_accum[vpu_assigned] =
+			    pva->vpu_util_info.vpu_stats_accum[vpu_assigned];
+			pva->vpu_util_info_cp.current_stamp[vpu_assigned] =
+			    pva->vpu_util_info.current_stamp[vpu_assigned];
+			pva->vpu_util_info_cp.last_start[vpu_assigned] =
+			    pva->vpu_util_info.last_start[vpu_assigned];
+
+			/* reset counter */
+			pva->vpu_util_info.vpu_stats_accum[stats->vpu_assigned] = 0;
+		}
+
+		if ((pva->vpu_util_info.flags & 0x3) == 0)
+			up(&pva->vpu_util_info.util_info_sema);
+	}
+
+	mutex_unlock(&pva->vpu_util_info.util_info_mutex);
+
 	r5_overhead = ((stats->complete_time - stats->queued_time) - vpu_time);
 	r5_overhead = r5_overhead / tsc_ticks_to_us;
 
@@ -985,12 +1058,21 @@ static void update_one_task(struct pva *pva)
 				    stats->complete_time,
 				    stats->vpu_assigned,
 				    r5_overhead);
+prof:
+	if (task->pva->profiling_level == 0)
+		goto out;
+
+	nvhost_eventlib_log_task(pdev,
+				 queue->syncpt_id,
+				 task->syncpt_thresh,
+				 stats->vpu_assigned_time,
+				 stats->complete_time);
 	pva_eventlib_record_r5_states(pdev,
 				      queue->syncpt_id,
 				      task->syncpt_thresh,
 				      stats,
 				      task);
-
+out:
 	/* Not linked anymore so drop the reference */
 	kref_put(&task->ref, pva_task_free);
 }
@@ -1084,8 +1166,8 @@ static int pva_task_submit(const struct pva_submit_tasks *task_header)
 	int err = 0;
 	u32 i;
 	u8 batchsize = task_header->num_tasks - 1U;
-		nvpva_dbg_info(first_task->pva, "submitting %u tasks; batchsize: %u",
-			task_header->num_tasks, batchsize);
+	nvpva_dbg_info(first_task->pva, "submitting %u tasks; batchsize: %u",
+		task_header->num_tasks, batchsize);
 
 	/*
 	 * TSC timestamp is same as CNTVCT. Task statistics are being
@@ -1096,9 +1178,10 @@ static int pva_task_submit(const struct pva_submit_tasks *task_header)
 #else
 	timestamp = arch_counter_get_cntvct();
 #endif
-
 	for (i = 0; i < task_header->num_tasks; i++) {
 		struct pva_submit_task *task = task_header->tasks[i];
+		struct pva_hw_task *hw_task = task->va;
+
 		/* take the reference until task is finished */
 		kref_get(&task->ref);
 
@@ -1108,6 +1191,8 @@ static int pva_task_submit(const struct pva_submit_tasks *task_header)
 		mutex_lock(&queue->list_lock);
 		list_add_tail(&task->node, &queue->tasklist);
 		mutex_unlock(&queue->list_lock);
+
+		hw_task->task.queued_time = timestamp;
 	}
 
 	/*
@@ -1138,6 +1223,9 @@ static int pva_task_submit(const struct pva_submit_tasks *task_header)
 		goto remove_tasks;
 	}
 
+	if (first_task->pva->profiling_level == 0)
+		goto out;
+
 	for (i = 0; i < task_header->num_tasks; i++) {
 		u32 j;
 		struct nvdev_fence pre_fence;
@@ -1160,7 +1248,7 @@ static int pva_task_submit(const struct pva_submit_tasks *task_header)
 					   task->syncpt_thresh,
 					   timestamp);
 	}
-
+out:
 	return 0;
 
 remove_tasks:
@@ -1181,19 +1269,46 @@ remove_tasks:
 }
 
 static void
-set_timer_flags(const struct pva_submit_tasks *task_header)
+set_task_parameters(const struct pva_submit_tasks *task_header)
 {
-	struct pva_hw_task *hw_task = NULL;
+	struct pva_submit_task *task = task_header->tasks[0];
+	struct pva_hw_task *hw_task = task->va;
+	struct nvpva_queue *queue = task->queue;
+
+	u8 status_interface = 0U;
+	u32 flag = 0;
+	u8 batch_id;
 	u16 idx;
+
+	/* Storing to local variable to update in task
+	 * Increment the batch ID and let it overflow
+	 * after it reached U8_MAX
+	 */
+	batch_id = (queue->batch_id++);
 
 	if (task_header->execution_timeout_us > 0U) {
 		hw_task = task_header->tasks[0]->va;
 		hw_task->task.timer_ref_cnt = task_header->num_tasks;
 		hw_task->task.timeout = task_header->execution_timeout_us;
-		for (idx = 0U; idx < task_header->num_tasks; idx++) {
-			hw_task = task_header->tasks[idx]->va;
-			hw_task->task.flags |= PVA_TASK_FL_DEC_TIMER;
-		}
+		flag = PVA_TASK_FL_DEC_TIMER;
+	}
+
+	/* In T19x, there is only 1 CCQ, so the response should come there
+	 * irrespective of the queue ID. In T23x, there are 8 CCQ FIFO's
+	 * thus the response should come in the correct CCQ
+	 */
+	if ((task->pva->submit_task_mode == PVA_SUBMIT_MODE_MMIO_CCQ)
+	   && (task_header->tasks[0]->pva->version == PVA_HW_GEN2))
+		status_interface = (task->queue->id + 1U);
+
+	for (idx = 0U; idx < task_header->num_tasks; idx++) {
+		task = task_header->tasks[idx];
+		hw_task = task->va;
+
+		hw_task->task.status_interface = status_interface;
+		hw_task->task.batch_id = batch_id;
+
+		hw_task->task.flags |= flag;
 	}
 
 }
@@ -1298,15 +1413,31 @@ static int pva_queue_submit(struct nvpva_queue *queue, void *args)
 		prev_hw_task = task->va;
 	}
 
-	set_timer_flags(task_header);
+	set_task_parameters(task_header);
 
 	/* Update L2SRAM flags for T23x */
 	if (task_header->tasks[0]->pva->version == PVA_HW_GEN2)
 		update_batch_tasks(task_header);
 
+	mutex_lock(&queue->tail_lock);
+
+	/* Once batch is ready, link it to the FW queue*/
+	if (queue->hw_task_tail)
+		queue->hw_task_tail->task.next = task_header->tasks[0]->dma_addr;
+
+	/* Hold a reference to old tail in case submission fails*/
+	queue->old_tail = queue->hw_task_tail;
+
+	queue->hw_task_tail = prev_hw_task;
+	mutex_unlock(&queue->tail_lock);
+
 	err = pva_task_submit(task_header);
-	if (err)
+	if (err) {
 		dev_err(&queue->vm_pdev->dev, "failed to submit task");
+		mutex_lock(&queue->tail_lock);
+		queue->hw_task_tail = queue->old_tail;
+		mutex_unlock(&queue->tail_lock);
+	}
 unlock:
 	mutex_unlock(&client->sema_val_lock);
 	return err;

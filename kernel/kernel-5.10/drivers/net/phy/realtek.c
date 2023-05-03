@@ -60,7 +60,6 @@
 #define RTLGEN_SPEED_MASK			0x0630
 
 #define RTL_GENERIC_PHYID			0x001cc800
-#define RTL_8211FVD_PHYID			0x001cc878
 
 #define RTL8211F_LED_PAGE			0xd04
 
@@ -88,6 +87,7 @@
 #define RTL8211F_WOL_SET_PACKET_LEN		BIT(15)
 #define RTL8211F_WOL_ENABLE_MAGIC_PACKET	BIT(12)
 #define RTL8211F_WOL_ENABLE_PMEB_EVENT		BIT(7)
+#define RTL8211F_VD_CG_WOL_ENABLE_PMEB_EVENT	BIT(12)
 
 #define BIT_SHIFT_8 8
 #define MAC_ADDRESS_BYTE_0 0
@@ -167,9 +167,11 @@ static int rtl8211f_ack_interrupt(struct phy_device *phydev)
 
 	/* ack the WOL interrupt and toggle the WOL specific registers
 	 * to enable PME pin for WOL trigger events for next time
-	 * until disabled from ethtool ioctl
+	 * until it is disabled from ethtool ioctl
 	 */
-	if (err & RTL8211F_WOL_ENABLE_PMEB_EVENT) {
+	if (((phydev->phy_id == 0x001cc878) &&
+	    (err & RTL8211F_VD_CG_WOL_ENABLE_PMEB_EVENT)) ||
+	    (err & RTL8211F_WOL_ENABLE_PMEB_EVENT)) {
 		ret = rtl8211f_wol_settings(phydev, false);
 		if (ret < 0)
 			return ret;
@@ -225,9 +227,15 @@ static int rtl8211e_config_intr(struct phy_device *phydev)
 static int rtl8211f_config_intr(struct phy_device *phydev)
 {
 	u16 val;
+	u16 pmeb_event;
+
+	if(phydev->phy_id == 0x001cc878)
+		pmeb_event = RTL8211F_VD_CG_WOL_ENABLE_PMEB_EVENT;
+	else
+		pmeb_event = RTL8211F_WOL_ENABLE_PMEB_EVENT;
 
 	if (phydev->interrupts == PHY_INTERRUPT_ENABLED)
-		val = (RTL8211F_INER_LINK_STATUS | RTL8211F_WOL_ENABLE_PMEB_EVENT);
+		val = (RTL8211F_INER_LINK_STATUS | pmeb_event);
 	else
 		val = 0;
 
@@ -266,13 +274,16 @@ static int rtl8211c_config_init(struct phy_device *phydev)
 static int rtl8211f_config_init(struct phy_device *phydev)
 {
 	struct device *dev = &phydev->mdio.dev;
-	u16 val_txdly, val_rxdly , oldpage;
+	u16 val_txdly, val_rxdly;
 	u16 val;
 	int ret;
 
 	val = RTL8211F_ALDPS_ENABLE | RTL8211F_ALDPS_PLL_OFF | RTL8211F_ALDPS_XTAL_OFF;
 	phy_modify_paged_changed(phydev, 0xa43, RTL8211F_PHYCR1, val, val);
 
+	/* CLKOUT Enable bit is NA for RTL8211F_VD phy IC
+	 * keeping programming as it is, since no effect in new phy IC
+	 */
 	val = phy_read_paged(phydev, 0xa43, RTL8211F_PHYCR2);
 	phy_modify_paged_changed(phydev, 0xa43, RTL8211F_PHYCR2, BIT(0), (val & ~BIT(0)));
 
@@ -336,33 +347,19 @@ static int rtl8211f_config_init(struct phy_device *phydev)
 		RTL8211F_LED1_LINK_100 | RTL8211F_LED1_LINK_10 |
 		RTL8211F_LED1_LINK_ACTIVE;
 
-	oldpage = phy_select_page(phydev, RTL8211F_LED_PAGE);
-	if (oldpage < 0)
-		dev_dbg(dev, "select page failed\n");
-	printk(KERN_INFO "RTL8211 SET LED!!");
-	ret = __phy_write(phydev, RTL8211F_PAGE_EEE_LED_CONTROL, 0x0000);
-	if (ret < 0)
-		dev_dbg(dev, "write EEE register failed\n");
-	ret = __phy_write(phydev, RTL8211F_PAGE_LCR_LED_CONTROL, 0x091b);
-	if (ret < 0)
-		dev_dbg(dev, "write LED register failed\n");	
-	phy_restore_page(phydev, oldpage, ret);
-	/*
-	ret = phy_modify_paged_changed(phydev, RTL8211F_LED_PAGE, RTL8211F_PAGE_LCR_LED_CONTROL, 0x091b,
-				       0x091b);
+	ret = phy_modify_paged_changed(phydev, RTL8211F_LED_PAGE, RTL8211F_PAGE_LCR_LED_CONTROL, val,
+				       val);
 	if (ret < 0) {
 		dev_err(dev, "Failed to LED registers\n");
 		return ret;
 	}
-	*/
 	/* disable EEE LED control */
-	/*
 	ret = phy_modify_paged_changed(phydev, RTL8211F_LED_PAGE, RTL8211F_PAGE_EEE_LED_CONTROL, 0, 0);
 	if (ret < 0) {
 		dev_err(dev, "Failed to EEE LED registers\n");
 		return ret;
 	}
-	*/
+
 	/* Advertise Flow Control */
 	linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydev->supported);
 	linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, phydev->supported);
@@ -813,6 +810,18 @@ static struct phy_driver realtek_drvs[] = {
 	}, {
 		PHY_ID_MATCH_EXACT(0x001cc916),
 		.name		= "RTL8211F Gigabit Ethernet",
+		.config_init	= &rtl8211f_config_init,
+		.ack_interrupt	= &rtl8211f_ack_interrupt,
+		.config_intr	= &rtl8211f_config_intr,
+		.get_wol	= &rtl8211f_get_wol,
+		.set_wol	= &rtl8211f_set_wol,
+		.suspend	= genphy_suspend,
+		.resume		= rtl821x_resume,
+		.read_page	= rtl821x_read_page,
+		.write_page	= rtl821x_write_page,
+	}, {
+		PHY_ID_MATCH_EXACT(0x001cc878),
+		.name		= "RTL8211F VD-CG Gigabit Ethernet",
 		.config_init	= &rtl8211f_config_init,
 		.ack_interrupt	= &rtl8211f_ack_interrupt,
 		.config_intr	= &rtl8211f_config_intr,

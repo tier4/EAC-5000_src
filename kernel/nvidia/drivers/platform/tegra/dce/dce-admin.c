@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -16,6 +16,7 @@
 #include <dce-mailbox.h>
 #include <dce-util-common.h>
 #include <dce-client-ipc-internal.h>
+#include <interface/dce-core-interface-errors.h>
 #include <interface/dce-interface.h>
 #include <interface/dce-admin-cmds.h>
 
@@ -308,13 +309,22 @@ int dce_admin_handle_ipc_requested_event(struct tegra_dce *d, void *params)
 	struct dce_admin_send_msg_params *admin_params =
 			(struct dce_admin_send_msg_params *)params;
 
+	/*
+	 * Do not handle admin IPC if boot commands are not completed
+	 */
+	if (!dce_is_bootcmds_done(d)) {
+		dce_err(d, "Boot commands are not yet completed\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
 	/* Error check on msg */
 	msg = admin_params->msg;
 
 	ret = dce_ipc_send_message_sync(d, DCE_IPC_CHANNEL_TYPE_ADMIN, msg);
 	if (ret)
 		dce_err(d, "Error sending admin message on admin interface");
-
+out:
 	return ret;
 }
 
@@ -374,8 +384,9 @@ int dce_admin_send_cmd_echo(struct tegra_dce *d,
 	req_msg->cmd = (uint32_t)DCE_ADMIN_CMD_ECHO;
 
 	ret = dce_admin_send_msg(d, msg);
-	if (ret) {
+	if ((ret) || (resp_msg->error != DCE_ERR_CORE_SUCCESS)) {
 		dce_err(d, "Error sending echo msg : [%d]", ret);
+		ret = ret ? ret : resp_msg->error;
 		goto out;
 	}
 
@@ -533,7 +544,7 @@ static int dce_admin_setup_clients_ipc(struct tegra_dce *d,
 			goto out;
 		}
 
-		if (resp_msg->error) {
+		if (resp_msg->error != DCE_ERR_CORE_SUCCESS) {
 			dce_err(d, "IPC create for type [%u] failed", i);
 			goto out;
 		}
@@ -569,7 +580,7 @@ static int dce_admin_send_rm_bootstrap(struct tegra_dce *d,
 		goto out;
 	}
 
-	if (resp_msg->error) {
+	if (resp_msg->error != DCE_ERR_CORE_SUCCESS) {
 		dce_err(d, "Error in handling rm bootstrap cmd on dce: [0x%x]",
 			resp_msg->error);
 		ret = -EINVAL;

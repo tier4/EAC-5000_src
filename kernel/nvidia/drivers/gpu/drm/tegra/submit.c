@@ -13,7 +13,6 @@
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
 #include <linux/sync_file.h>
-#include <linux/version.h>
 
 #include <drm/drm_drv.h>
 #include <drm/drm_file.h>
@@ -350,6 +349,16 @@ static int submit_get_syncpt(struct tegra_drm_context *context, struct host1x_jo
 	job->syncpt = host1x_syncpt_get(sp);
 	job->syncpt_incrs = args->syncpt.increments;
 
+	if (args->flags & DRM_TEGRA_SUBMIT_SECONDARY_SYNCPT) {
+		sp = xa_load(syncpoints, args->secondary_syncpt_id);
+		if (!sp) {
+			SUBMIT_ERR(context, "secondary syncpt was not allocated");
+			return -EINVAL;
+		}
+
+		job->secondary_syncpt = host1x_syncpt_get(sp);
+	}
+
 	return 0;
 }
 
@@ -499,14 +508,17 @@ static void release_job(struct host1x_job *job)
 	struct tegra_drm_submit_data *job_data = job->user_data;
 	u32 i;
 
+	if (job->memory_context)
+		host1x_memory_context_put(job->memory_context);
+
 	for (i = 0; i < job_data->num_used_mappings; i++)
 		tegra_drm_mapping_put(job_data->used_mappings[i].mapping);
 
 	kfree(job_data->used_mappings);
 	kfree(job_data);
 
-	if (pm_runtime_enabled(client->base.dev))
-		pm_runtime_put_autosuspend(client->base.dev);
+	pm_runtime_mark_last_busy(client->base.dev);
+	pm_runtime_put_autosuspend(client->base.dev);
 }
 
 int tegra_drm_ioctl_channel_submit(struct drm_device *drm, void *data,
@@ -530,6 +542,11 @@ int tegra_drm_ioctl_channel_submit(struct drm_device *drm, void *data,
 		pr_err_ratelimited("%s: %s: invalid channel context '%#x'", __func__,
 				   current->comm, args->context);
 		return -EINVAL;
+	}
+
+	if (args->flags & !(DRM_TEGRA_SUBMIT_SECONDARY_SYNCPT)) {
+		SUBMIT_ERR(context, "invalid flags '%#x'", args->flags);
+		goto unlock;
 	}
 
 	if (args->syncobj_in) {
@@ -589,19 +606,51 @@ int tegra_drm_ioctl_channel_submit(struct drm_device *drm, void *data,
 		goto put_job;
 	}
 
-	/* Boot engine. */
-	if (pm_runtime_enabled(context->client->base.dev)) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
-		err = pm_runtime_resume_and_get(context->client->base.dev);
-		if (err < 0) {
-#else
-		err = pm_runtime_get_sync(context->client->base.dev);
-		if (err < 0) {
-			pm_runtime_put_noidle(context->client->base.dev);
-#endif
-			SUBMIT_ERR(context, "could not power up engine: %d", err);
+	if (context->client->ops->get_streamid_offset) {
+		err = context->client->ops->get_streamid_offset(
+			context->client, &job->engine_streamid_offset);
+		if (err) {
+			SUBMIT_ERR(context, "failed to get streamid offset: %d", err);
 			goto unpin_job;
 		}
+	}
+
+	if (context->memory_context && context->client->ops->can_use_memory_ctx) {
+		bool supported;
+
+		err = context->client->ops->can_use_memory_ctx(context->client, &supported);
+		if (err) {
+			SUBMIT_ERR(context, "failed to detect if engine can use memory context: %d", err);
+			goto unpin_job;
+		}
+
+		if (supported) {
+			job->memory_context = context->memory_context;
+			host1x_memory_context_get(job->memory_context);
+		}
+	} else if (context->client->ops->get_streamid_offset) {
+#ifdef CONFIG_IOMMU_API
+		struct iommu_fwspec *spec;
+
+		/*
+		 * Job submission will need to temporarily change stream ID,
+		 * so need to tell it what to change it back to.
+		 */
+		spec = dev_iommu_fwspec_get(context->client->base.dev);
+		if (spec && spec->num_ids > 0)
+			job->engine_fallback_streamid = spec->ids[0] & 0xffff;
+		else
+			job->engine_fallback_streamid = 0x7f;
+#else
+		job->engine_fallback_streamid = 0x7f;
+#endif
+	}
+
+	/* Boot engine. */
+	err = pm_runtime_resume_and_get(context->client->base.dev);
+	if (err < 0) {
+		SUBMIT_ERR(context, "could not power up engine: %d", err);
+		goto put_memory_context;
 	}
 
 	job->user_data = job_data;
@@ -625,7 +674,7 @@ int tegra_drm_ioctl_channel_submit(struct drm_device *drm, void *data,
 	args->syncpt.value = job->syncpt_end;
 
 	if (syncobj) {
-		struct dma_fence *fence = host1x_fence_create(job->syncpt, job->syncpt_end);
+		struct dma_fence *fence = host1x_fence_create(job->syncpt, job->syncpt_end, true);
 		if (IS_ERR(fence)) {
 			err = PTR_ERR(fence);
 			SUBMIT_ERR(context, "failed to create postfence: %d", err);
@@ -636,6 +685,9 @@ int tegra_drm_ioctl_channel_submit(struct drm_device *drm, void *data,
 
 	goto put_job;
 
+put_memory_context:
+	if (job->memory_context)
+		host1x_memory_context_put(job->memory_context);
 unpin_job:
 	host1x_job_unpin(job);
 put_job:

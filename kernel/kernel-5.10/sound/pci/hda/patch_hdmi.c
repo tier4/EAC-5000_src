@@ -157,7 +157,10 @@ struct hdmi_spec {
 
 	bool dyn_pin_out;
 	bool dyn_pcm_assign;
-	bool tegra_fixup;	/* apply Nvidia Tegra platform-specific fixups */
+	/* hdmi interrupt trigger control flag for Nvidia codec */
+	bool hdmi_intr_trig_ctrl;
+	bool nv_dp_workaround; /* workaround DP audio infoframe for Nvidia */
+
 	bool intel_hsw_fixup;	/* apply Intel platform-specific fixups */
 	/*
 	 * Non-generic VIA/NVIDIA specific
@@ -206,9 +209,7 @@ struct dp_audio_infoframe {
 	u8 type; /* 0x84 */
 	u8 len;  /* 0x1b */
 	u8 ver;  /* 0x11 << 2 */
-#if IS_ENABLED(CONFIG_SND_HDA_TEGRA)
-	u8 checksum;
-#endif
+
 	u8 CC02_CT47;	/* match with HDMI infoframe from this on */
 	u8 SS01_SF24;
 	u8 CXT04;
@@ -669,15 +670,24 @@ static void hdmi_pin_setup_infoframe(struct hda_codec *codec,
 				     int ca, int active_channels,
 				     int conn_type)
 {
+	struct hdmi_spec *spec = codec->spec;
 	union audio_infoframe ai;
 
 	memset(&ai, 0, sizeof(ai));
-	if (conn_type == 0) { /* HDMI */
+	if ((conn_type == 0) || /* HDMI */
+		/* Nvidia DisplayPort: Nvidia HW expects same layout as HDMI */
+		(conn_type == 1 && spec->nv_dp_workaround)) {
 		struct hdmi_audio_infoframe *hdmi_ai = &ai.hdmi;
 
-		hdmi_ai->type		= 0x84;
-		hdmi_ai->ver		= 0x01;
-		hdmi_ai->len		= 0x0a;
+		if (conn_type == 0) { /* HDMI */
+			hdmi_ai->type		= 0x84;
+			hdmi_ai->ver		= 0x01;
+			hdmi_ai->len		= 0x0a;
+		} else {/* Nvidia DP */
+			hdmi_ai->type		= 0x84;
+			hdmi_ai->ver		= 0x1b;
+			hdmi_ai->len		= 0x11 << 2;
+		}
 		hdmi_ai->CC02_CT47	= active_channels - 1;
 		hdmi_ai->CA		= ca;
 		hdmi_checksum_audio_infoframe(hdmi_ai);
@@ -893,11 +903,8 @@ static int hdmi_pin_hbr_setup(struct hda_codec *codec, hda_nid_t pin_nid,
 			      int dev_id, bool hbr)
 {
 	int pinctl, new_pinctl;
-	struct hdmi_spec *spec = codec->spec;
 
-	/* Assuming the HW supports HBR for Tegra HDMI */
-	if ((snd_hda_query_pin_caps(codec, pin_nid) & AC_PINCAP_HBR) ||
-		spec->tegra_fixup) {
+	if (snd_hda_query_pin_caps(codec, pin_nid) & AC_PINCAP_HBR) {
 		snd_hda_set_dev_select(codec, pin_nid, dev_id);
 		pinctl = snd_hda_codec_read(codec, pin_nid, 0,
 					    AC_VERB_GET_PIN_WIDGET_CONTROL, 0);
@@ -1628,9 +1635,12 @@ static void hdmi_present_sense_via_verbs(struct hdmi_spec_per_pin *per_pin,
 	int present;
 	int ret;
 
+#ifdef CONFIG_PM
+	if (dev->power.runtime_status == RPM_SUSPENDING)
+		return;
+#endif
 	ret = snd_hda_power_up_pm(codec);
-	if ((ret < 0 && pm_runtime_suspended(dev)) ||
-		(dev->power.runtime_status == RPM_SUSPENDING))
+	if (ret < 0 && pm_runtime_suspended(dev))
 		goto out;
 
 	present = snd_hda_jack_pin_sense(codec, pin_nid, dev_id);
@@ -1650,11 +1660,6 @@ static void hdmi_present_sense_via_verbs(struct hdmi_spec_per_pin *per_pin,
 		if (spec->ops.pin_get_eld(codec, pin_nid, dev_id,
 					  eld->eld_buffer, &eld->eld_size) < 0)
 			eld->eld_valid = false;
-
-		if (snd_hdmi_parse_eld(codec, &eld->info, eld->eld_buffer,
-						    eld->eld_size) < 0)
-			eld->eld_valid = false;
-
 	}
 
 	update_eld(codec, per_pin, eld, repoll);
@@ -2367,11 +2372,6 @@ static int generic_hdmi_build_controls(struct hda_codec *codec)
 		if (dev != SNDRV_PCM_INVALID_DEVICE) {
 			/* add control for ELD Bytes */
 			err = hdmi_create_eld_ctl(codec, pcm_idx, dev);
-			if (err < 0)
-				return err;
-
-			/* add control for custom ELD */
-			err = hdmi_create_custom_eld_ctl(codec, pcm_idx, dev);
 			if (err < 0)
 				return err;
 		}
@@ -3523,6 +3523,7 @@ static int patch_nvhdmi_2ch(struct hda_codec *codec)
 	spec->pcm_playback.rates = SUPPORTED_RATES;
 	spec->pcm_playback.maxbps = SUPPORTED_MAXBPS;
 	spec->pcm_playback.formats = SUPPORTED_FORMATS;
+	spec->nv_dp_workaround = true;
 	return 0;
 }
 
@@ -3662,6 +3663,7 @@ static int patch_nvhdmi(struct hda_codec *codec)
 	spec->chmap.ops.chmap_cea_alloc_validate_get_type =
 		nvhdmi_chmap_cea_alloc_validate_get_type;
 	spec->chmap.ops.chmap_validate = nvhdmi_chmap_validate;
+	spec->nv_dp_workaround = true;
 
 	codec->link_down_at_suspend = 1;
 
@@ -3685,6 +3687,7 @@ static int patch_nvhdmi_legacy(struct hda_codec *codec)
 	spec->chmap.ops.chmap_cea_alloc_validate_get_type =
 		nvhdmi_chmap_cea_alloc_validate_get_type;
 	spec->chmap.ops.chmap_validate = nvhdmi_chmap_validate;
+	spec->nv_dp_workaround = true;
 
 	codec->link_down_at_suspend = 1;
 
@@ -3714,7 +3717,7 @@ static int patch_nvhdmi_legacy(struct hda_codec *codec)
  *
  * Note that for the trigger bit to take effect it needs to change value
  * (i.e. it needs to be toggled). The trigger bit is not applicable from
- * TEGRA23x chip onwards, as new verb id 0xf80 will be used for interrupt
+ * TEGRA234 chip onwards, as new verb id 0xf80 will be used for interrupt
  * trigger to hdmi.
  */
 #define NVIDIA_SET_HOST_INTR		0xf80
@@ -3742,9 +3745,10 @@ static void tegra_hdmi_set_format(struct hda_codec *codec,
 {
 	unsigned int value;
 	unsigned int nid = NVIDIA_AFG_NID;
+	struct hdmi_spec *spec = codec->spec;
 
 	/*
-	 * Tegra HDA codec design from TEGRA23x chip onwards support DP MST.
+	 * Tegra HDA codec design from TEGRA234 chip onwards support DP MST.
 	 * This resulted in moving scratch registers from audio function
 	 * group to converter widget context. So CVT NID should be used for
 	 * scratch register read/write for DP MST supported Tegra HDA codec.
@@ -3778,7 +3782,7 @@ static void tegra_hdmi_set_format(struct hda_codec *codec,
 	else
 		value |= NVIDIA_SCRATCH_VALID;
 
-	if (codec->hdmi_intr_trig_ctrl) {
+	if (spec->hdmi_intr_trig_ctrl) {
 		/*
 		 * For Tegra HDA Codec design from TEGRA23x onwards, the
 		 * Interrupt to hdmi driver is triggered by writing
@@ -3876,8 +3880,6 @@ static int tegra_hdmi_init(struct hda_codec *codec)
 	struct hdmi_spec *spec = codec->spec;
 	int i, err;
 
-	spec->tegra_fixup = true;
-
 	err = hdmi_parse_codec(codec);
 	if (err < 0) {
 		generic_spec_free(codec);
@@ -3891,6 +3893,7 @@ static int tegra_hdmi_init(struct hda_codec *codec)
 
 	generic_hdmi_init_per_pins(codec);
 
+	codec->depop_delay = 10;
 	codec->patch_ops.build_pcms = tegra_hdmi_build_pcms;
 	spec->chmap.ops.chmap_cea_alloc_validate_get_type =
 		nvhdmi_chmap_cea_alloc_validate_get_type;
@@ -3899,6 +3902,7 @@ static int tegra_hdmi_init(struct hda_codec *codec)
 	spec->chmap.ops.chmap_cea_alloc_validate_get_type =
 		nvhdmi_chmap_cea_alloc_validate_get_type;
 	spec->chmap.ops.chmap_validate = nvhdmi_chmap_validate;
+	spec->nv_dp_workaround = true;
 
 	return 0;
 }
@@ -3925,10 +3929,10 @@ static int patch_tegra_t23x_hdmi(struct hda_codec *codec)
 
 	codec->dp_mst = true;
 	codec->mst_no_extra_pcms = true;
-	codec->hdmi_intr_trig_ctrl = true;
 	spec = codec->spec;
 	spec->dyn_pin_out = true;
 	spec->dyn_pcm_assign = true;
+	spec->hdmi_intr_trig_ctrl = true;
 
 	return tegra_hdmi_init(codec);
 }

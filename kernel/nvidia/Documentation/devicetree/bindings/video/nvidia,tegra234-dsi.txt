@@ -45,7 +45,7 @@ These properties are parsed by Tegra Display Firmware and are used for programmi
  under dsi node will be parsed by Display Firmware.
 
  Required properties
- - name: Can be arbitrary. Prefer to have panel vendor name with panel size or resolution to get a unique name.
+ - name: Can be arbitrary. Prefer to ahve panel vendor name with panel size or resolution to get a unique name.
  - compatible: Can be arbitrary. One panel has its own unique compatible.
  - nvidia,panel-rst-gpio: panel reset gpio.
  - nvidia,avdd-avee-en-gpio: gpio to enable AVDD/AVEE supplies to panel

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -208,8 +208,12 @@
 		};
 	};
 
+	nvpmodel {
+		status = "okay";
+	};
+
 	soctherm-oc-event {
-		status = "disabled";
+		status = "okay";
 	};
 
 	display@13800000 {
@@ -225,6 +229,10 @@
 			prod {
 				prod = <0x04 0x000000ff 0x10>;
 			};
+			/delete-node/ prod_c_nonsecure;
+			/delete-node/ prod_c_nopwrsave;
+			/delete-node/ prod_c_secure;
+			/delete-node/ prod_c_pwrsave;
 		};
 		/* QSPI NOR */
 		spiflash@0 {

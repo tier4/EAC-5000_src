@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2019-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -56,6 +56,7 @@
 #define DCE_FW_ADMIN_SEQ_START		DCE_BIT(10)
 #define DCE_FW_ADMIN_SEQ_FAILED		DCE_BIT(9)
 #define DCE_FW_ADMIN_SEQ_DONE		DCE_BIT(8)
+#define DCE_FW_SUSPENDED		DCE_BIT(2)
 #define DCE_FW_BOOT_DONE		DCE_BIT(1)
 #define DCE_STATUS_FAILED		DCE_BIT(0)
 #define DCE_STATUS_UNKNOWN		((u32)(0))
@@ -67,16 +68,6 @@ struct tegra_dce;
  *				cluster data.
  */
 struct dce_platform_data {
-	/**
-	 * @d : Pointer to OS agnostic dce struct. Stores all runitme info
-	 * for dce cluster elements.
-	 */
-	struct tegra_dce *d;
-	/**
-	 * @max_cpu_irqs : stores maximum no. os irqs from DCE cluster to CPU
-	 * for this platform.
-	 */
-	u8 max_cpu_irqs;
 	/**
 	 * @fw_dce_addr : Stores the firmware address that DCE sees before being
 	 * converted by AST.
@@ -105,6 +96,10 @@ struct dce_platform_data {
 	 * only.
 	 */
 	u8 stream_id;
+	/**
+	 * hsp_id - HSP instance id used for dce communication
+	 */
+	u32 hsp_id;
 	/**
 	 * fw_vmindex : VMIndex to program the AST region to read FW in debug
 	 * mode only.
@@ -168,6 +163,10 @@ struct tegra_dce {
 	 */
 	struct dce_wait_cond ipc_waits[DCE_MAX_WAIT];
 	/**
+	 * dce_bootstrap_done - Data structure to manage wait for boot done
+	 */
+	struct dce_cond dce_bootstrap_done;
+	/**
 	 * @d_mb - Stores the current status of dce mailbox interfaces.
 	 */
 	struct dce_mailbox_interface d_mb[DCE_MAILBOX_MAX_INTERFACES];
@@ -184,6 +183,10 @@ struct tegra_dce {
 	 * @d_async_ipc_info - stores data to handle async events
 	 */
 	struct tegra_dce_async_ipc_info d_async_ipc;
+	/**
+	 * @hsp_id - HSP instance id used for dce communication
+	 */
+	u32 hsp_id;
 	/**
 	 * @boot_status - u32 variable to store dce's boot status.
 	 */
@@ -229,6 +232,15 @@ struct dce_device {
 	 * @dev : Pointer to DCE Cluster's Linux device struct.
 	 */
 	struct device *dev;
+	/**
+	 * @pdata : Pointer to dce platform data struct.
+	 */
+	struct dce_platform_data *pdata;
+	/**
+	 * @max_cpu_irqs : stores maximum no. os irqs from DCE cluster to CPU
+	 * for this platform.
+	 */
+	u8 max_cpu_irqs;
 	/**
 	 * @regs : Stores the cpu-mapped base address of DCE Cluster. Will be
 	 * used for MMIO transactions to DCE elements.
@@ -276,7 +288,7 @@ static inline struct device *dev_from_dce(struct tegra_dce *d)
  */
 static inline struct dce_platform_data *pdata_from_dce(struct tegra_dce *d)
 {
-	return dev_get_drvdata(dev_from_dce(d));
+	return ((struct dce_device *)dev_get_drvdata(dev_from_dce(d)))->pdata;
 }
 
 /**
@@ -290,6 +302,22 @@ static inline struct dce_platform_data *pdata_from_dce(struct tegra_dce *d)
 static inline void dce_set_boot_complete(struct tegra_dce *d, bool val)
 {
 	d->boot_complete = val;
+	if (!val)
+		d->boot_status &= (~DCE_FW_BOOT_DONE);
+}
+
+/**
+ * dce_is_bootcmds_done - Checks if dce bootstrap bootcmds done.
+ *
+ * Chekc if all the mailbox boot commands are completed
+ *
+ * @d - Pointer to tegra_dce struct.
+ *
+ * Return : True if bootcmds are completed
+ */
+static inline bool dce_is_bootcmds_done(struct tegra_dce *d)
+{
+	return (d->boot_status & DCE_FW_BOOTSTRAP_DONE) ? true : false;
 }
 
 /**
@@ -360,6 +388,8 @@ const char *dce_get_fw_name(struct tegra_dce *d);
 int dce_driver_init(struct tegra_dce *d);
 void dce_driver_deinit(struct tegra_dce *d);
 
+int dce_start_boot_flow(struct tegra_dce *d);
+void dce_bootstrap_work_fn(struct tegra_dce *d);
 int dce_start_bootstrap_flow(struct tegra_dce *d);
 int dce_boot_interface_init(struct tegra_dce *d);
 void dce_boot_interface_deinit(struct tegra_dce *d);
@@ -405,6 +435,7 @@ int dce_reset_dce(struct tegra_dce *d);
 
 #ifdef CONFIG_DEBUG_FS
 void dce_init_debug(struct tegra_dce *d);
+void dce_remove_debug(struct tegra_dce *d);
 #endif
 
 #endif

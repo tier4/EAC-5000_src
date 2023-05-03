@@ -301,6 +301,50 @@ struct pva_vpu_dbg_block {
 };
 
 /**
+ * @brief		VPU utilization information
+ *
+ * vpu_stats_accum	long term accumulator of VPU active time.
+ * current_stamp	time stamp of last task completed
+ * last_start		time stamp of start of last task completed
+ * start_stamp		time stamp when measurment started
+ * end_stamp		time stamp when measurment is to end
+ * vpu_stats		avaraged vpu utilization stats
+ * flags		undefined use at this time
+ * util_info_mutex	mutex for protecting stats data structure
+ */
+struct pva_vpu_util_info {
+	u64 vpu_stats_accum[2];
+	u64 current_stamp[2];
+	u64 last_start[2];
+	u64 start_stamp;
+	u64 end_stamp;
+	u32 vpu_stats[2];
+	u32 flags;
+	struct mutex util_info_mutex;
+	struct semaphore util_info_sema;
+};
+
+struct scatterlist;
+struct nvpva_syncpt_desc {
+	dma_addr_t addr;
+	size_t size;
+	u32 id;
+	u32 assigned;
+};
+
+struct nvpva_syncpts_desc {
+	struct platform_device *host_pdev;
+	struct nvpva_syncpt_desc syncpts_rw[MAX_PVA_QUEUE_COUNT];
+	dma_addr_t syncpt_start_iova_r;
+	dma_addr_t syncpt_range_r;
+	dma_addr_t syncpt_start_iova_rw;
+	dma_addr_t syncpt_range_rw;
+	uint32_t   page_size;
+	bool	   syncpts_mapped_r;
+	bool	   syncpts_mapped_rw;
+};
+
+/**
  * @brief		Driver private data, shared with all applications
  *
  * version		pva version; 1 or 2
@@ -325,11 +369,15 @@ struct pva_vpu_dbg_block {
  * r5_dbg_wait		Set the r5 debugger to wait
  * timeout_enabled	Set pva timeout enabled based on debug
  * slcg_disable		Second level Clock Gating control variable
+ * vpu_printf_enabled
+ * vpu_debug_enabled
  * log_level		controls the level of detail printed by FW
  *			debug statements
+ * profiling_level
  * driver_log_mask	controls the level of detail printed by kernel
  *			debug statements
- **/
+ */
+
 struct pva {
 	int version;
 	struct pva_version_config *version_config;
@@ -338,6 +386,7 @@ struct pva {
 	struct pva_fw fw_info;
 	struct pva_vpu_auth_s pva_auth;
 	struct pva_vpu_auth_s pva_auth_sys;
+	struct nvpva_syncpts_desc syncpts;
 
 	int irq[MAX_PVA_IRQS];
 	s32 sids[16];
@@ -365,7 +414,6 @@ struct pva {
 	struct work_struct task_update_work;
 	atomic_t n_pending_tasks;
 	struct workqueue_struct *task_status_workqueue;
-
 	struct pva_trace_log pva_trace;
 	u32 submit_task_mode;
 	u32 submit_cmd_mode;
@@ -376,12 +424,15 @@ struct pva {
 	u32 vmem_war_disable;
 	bool vpu_printf_enabled;
 	bool vpu_debug_enabled;
+	bool stats_enabled;
+	struct pva_vpu_util_info vpu_util_info;
+	struct pva_vpu_util_info vpu_util_info_cp;
+	u32 profiling_level;
 
 	struct work_struct pva_abort_handler_work;
 	bool booted;
 	u32 log_level;
 	u32 driver_log_mask;
-
 	struct nvpva_client_context *clients;
 	struct mutex clients_lock;
 

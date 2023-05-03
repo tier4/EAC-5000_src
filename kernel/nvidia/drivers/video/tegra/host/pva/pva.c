@@ -59,6 +59,14 @@
 #include "pva-ucode-header.h"
 #include "pva_system_allow_list.h"
 #include "pva_iommu_context_dev.h"
+#include "nvpva_syncpt.h"
+
+/*
+ * NO IOMMU set 0x60000000 as start address.
+ * With IOMMU set 0x80000000(>2GB) as startaddress
+ */
+#define DRAM_PVA_IOVA_START_ADDRESS 0x80000000
+#define DRAM_PVA_NO_IOMMU_START_ADDRESS 0x60000000
 
 extern struct platform_driver nvpva_iommu_context_dev_driver;
 
@@ -289,8 +297,8 @@ int nvpva_set_task_status_buffer(struct pva *pva)
 
 /* Default buffer size (256 kbytes) used for ucode trace log*/
 #define PVA_PRIV2_TRACE_LOG_BUFFER_SIZE 0x40000
-
 #define R5_USER_SEGREG_OFFSET 0x40000000
+
 static int pva_init_fw(struct platform_device *pdev)
 {
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
@@ -301,7 +309,8 @@ static int pva_init_fw(struct platform_device *pdev)
 	u32 *ucode_ptr;
 	int err = 0, w;
 	u64 ucode_useg_addr;
-	int sema_value = 0;
+	u32 sema_value = 0;
+	u32 dram_base;
 
 	nvpva_dbg_fn(pva, "");
 
@@ -396,6 +405,56 @@ static int pva_init_fw(struct platform_device *pdev)
 	sema_value |= (PVA_BOOT_INT | PVA_TEST_WAIT | PVA_VMEM_MBX_WAR_ENABLE);
 	host1x_writel(pdev, hsp_ss0_set_r(), sema_value);
 
+	if (pva->version == PVA_HW_GEN1) {
+		host1x_writel(pdev, hsp_ss2_set_r(), 0xFFFFFFFF);
+		host1x_writel(pdev, hsp_ss3_set_r(), 0xFFFFFFFF);
+	} else {
+		if (pva->syncpts.syncpt_start_iova_r > 0xFBFFFFFF) {
+			dev_err(&pdev->dev,
+				"rd sema base greater than 32 bit ");
+			err = -EINVAL;
+			goto out;
+		}
+
+		sema_value = (u32)pva->syncpts.syncpt_start_iova_r;
+		if (iommu_get_domain_for_dev(&pdev->dev))
+			dram_base = DRAM_PVA_IOVA_START_ADDRESS;
+		else
+			dram_base = DRAM_PVA_NO_IOMMU_START_ADDRESS;
+
+		if (sema_value < dram_base) {
+			dev_err(&pdev->dev,
+				"rd sema base less than dram base");
+			err = -EINVAL;
+			goto out;
+		}
+
+		sema_value -= dram_base;
+
+		host1x_writel(pdev, hsp_ss2_clr_r(), 0xFFFFFFFF);
+		host1x_writel(pdev, hsp_ss2_set_r(), sema_value);
+
+		if (pva->syncpts.syncpt_start_iova_rw > 0xFFF7FFFF) {
+			dev_err(&pdev->dev,
+				"rw sema base greater than 32 bit ");
+			err = -EINVAL;
+			goto out;
+		}
+
+		sema_value = (u32)pva->syncpts.syncpt_start_iova_rw;
+		if (sema_value < dram_base) {
+			dev_err(&pdev->dev,
+				"rw sema base less than dram base");
+			err = -EINVAL;
+			goto out;
+		}
+
+		sema_value -= dram_base;
+
+		host1x_writel(pdev, hsp_ss3_clr_r(), 0xFFFFFFFF);
+		host1x_writel(pdev, hsp_ss3_set_r(), sema_value);
+	}
+
 	/* Take R5 out of reset */
 	host1x_writel(pdev, proc_cpuhalt_r(),
 		      proc_cpuhalt_ncpuhalt_f(proc_cpuhalt_ncpuhalt_done_v()));
@@ -414,6 +473,7 @@ static int pva_init_fw(struct platform_device *pdev)
 	pva_reset_task_status_buffer(pva);
 	err = nvpva_set_task_status_buffer(pva);
 wait_timeout:
+out:
 	return err;
 }
 
@@ -449,13 +509,6 @@ int nvpva_request_firmware(struct platform_device *pdev, const char *fw_name,
 	return err;
 }
 
-/*
- * NO IOMMU set 0x60000000 as start address.
- * With IOMMU set 0x80000000(>2GB) as startaddress
- */
-#define DRAM_PVA_IOVA_START_ADDRESS 0x80000000
-#define DRAM_PVA_NO_IOMMU_START_ADDRESS 0x60000000
-
 static int pva_read_ucode(struct platform_device *pdev, const char *fw_name,
 			  struct pva *pva)
 {
@@ -490,8 +543,13 @@ static int pva_read_ucode(struct platform_device *pdev, const char *fw_name,
 		goto clean_up;
 	}
 
+	nvpva_dbg_info(pva,
+		       "priv 1 segment addr  = %llx\n",
+		       (u64)pva->priv1_dma.pa);
+
 	/* Make sure the buffer allocated to R5 are 4K aligned */
-	fw_info->priv1_buffer.va = (void *)ALIGN((u64)pva->priv1_dma.va, SZ_4K);
+	fw_info->priv1_buffer.va =
+		(void *)ALIGN((u64)pva->priv1_dma.va, SZ_4K);
 	fw_info->priv1_buffer.pa =
 		(dma_addr_t)ALIGN((u64)pva->priv1_dma.pa, SZ_4K);
 
@@ -530,6 +588,9 @@ static int pva_read_ucode(struct platform_device *pdev, const char *fw_name,
 			else
 				useg->phys_addr =
 					DRAM_PVA_NO_IOMMU_START_ADDRESS;
+
+			nvpva_dbg_info(pva, "phys = %llx\n", useg->phys_addr);
+
 			break;
 		case PVA_UCODE_SEG_CRASHDUMP:
 			fw_info->priv2_buffer.size += useg->size;
@@ -587,10 +648,13 @@ static int pva_read_ucode(struct platform_device *pdev, const char *fw_name,
 		goto clean_up;
 	}
 
+	nvpva_dbg_info(pva, "segment addr  = %llx\n", (u64)pva->priv2_dma.pa);
+
 	/* Make sure the buffer allocated to R5 are 4K aligned */
 	fw_info->priv2_buffer.va = (void *)ALIGN((u64)pva->priv2_dma.va, SZ_4K);
 
-	trace->addr = (void *)((u8 *)fw_info->priv2_buffer.va + trace->offset);
+	trace->addr =
+		(void *)((u8 *)fw_info->priv2_buffer.va + trace->offset);
 	memset(trace->addr, 0, trace->size);
 
 	fw_info->priv2_buffer.pa =
@@ -622,6 +686,8 @@ static int pva_load_fw(struct platform_device *pdev)
 	int err = 0;
 	struct nvhost_device_data *pdata = platform_get_drvdata(pdev);
 	struct pva *pva = pdata->private_data;
+
+	nvpva_dbg_fn(pva, "");
 
 	err = pva_read_ucode(pdev, pdata->firmware_name, pva);
 	if (err < 0)
@@ -801,10 +867,18 @@ int pva_finalize_poweron(struct platform_device *pdev)
 	nvpva_write_hwid(pdev);
 
 	/* Enable LIC_INTERRUPT line for HSP1, H1X and WDT */
-	host1x_writel(pva->pdev, sec_lic_intr_enable_r(pva->version),
-		      sec_lic_intr_enable_hsp_f(SEC_LIC_INTR_HSP1) |
-			      sec_lic_intr_enable_h1x_f(SEC_LIC_INTR_H1X_ALL) |
+	if (pva->version == PVA_HW_GEN1) {
+		host1x_writel(pva->pdev, sec_lic_intr_enable_r(pva->version),
+			      sec_lic_intr_enable_hsp_f(SEC_LIC_INTR_HSP1) |
+			      sec_lic_intr_enable_h1x_f(SEC_LIC_INTR_H1X_ALL_19) |
 			      sec_lic_intr_enable_wdt_f(SEC_LIC_INTR_WDT));
+	} else {
+		host1x_writel(pva->pdev, sec_lic_intr_enable_r(pva->version),
+			      sec_lic_intr_enable_hsp_f(SEC_LIC_INTR_HSP1) |
+			      sec_lic_intr_enable_h1x_f(SEC_LIC_INTR_H1X_ALL_23) |
+			      sec_lic_intr_enable_wdt_f(SEC_LIC_INTR_WDT));
+
+	}
 
 	err = pva_load_fw(pdev);
 	if (err < 0) {
@@ -920,6 +994,11 @@ static int pva_probe(struct platform_device *pdev)
 #endif
 
 	match = of_match_device(tegra_pva_of_match, dev);
+	if (!match) {
+		dev_err(dev, "no match for pva dev\n");
+		err = -ENODATA;
+		goto err_get_pdata;
+	}
 	pdata = (struct nvhost_device_data *)match->data;
 
 	WARN_ON(!pdata);
@@ -928,7 +1007,9 @@ static int pva_probe(struct platform_device *pdev)
 		err = -ENODATA;
 		goto err_get_pdata;
 	}
-
+#if !IS_ENABLED(CONFIG_TEGRA_GRHOST)
+	of_platform_default_populate(dev->of_node, NULL, dev);
+#endif
 	if ((pdata->version != PVA_HW_GEN1)
 	     && !is_cntxt_initialized()) {
 		dev_warn(&pdev->dev,
@@ -999,6 +1080,13 @@ static int pva_probe(struct platform_device *pdev)
 	pva->vpu_printf_enabled = true;
 	pva->vpu_debug_enabled = true;
 	pva->driver_log_mask = NVPVA_DEFAULT_DBG_MASK;
+	pva->profiling_level = 0;
+	pva->stats_enabled = false;
+	memset(&pva->vpu_util_info, 0, sizeof(pva->vpu_util_info));
+	mutex_init(&pva->vpu_util_info.util_info_mutex);
+	sema_init(&pva->vpu_util_info.util_info_sema, 0);
+	pva->syncpts.syncpts_mapped_r = false;
+	pva->syncpts.syncpts_mapped_rw = false;
 
 #ifdef __linux__
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
@@ -1067,7 +1155,11 @@ static int pva_probe(struct platform_device *pdev)
 
 	err = nvhost_syncpt_unit_interface_init(pdev);
 	if (err)
-		goto err_mss_init;
+		goto err_isr_init;
+
+	err = nvpva_syncpt_unit_interface_init(pdev);
+	if (err)
+		goto err_syncpt_xface_init;
 
 	mutex_init(&pva->pva_auth.allow_list_lock);
 	mutex_init(&pva->pva_auth_sys.allow_list_lock);
@@ -1083,12 +1175,12 @@ static int pva_probe(struct platform_device *pdev)
 					 &pva->sid_count,
 					 NVPVA_USER_VM_COUNT);
 	if (err)
-		goto err_mss_init;
+		goto err_iommu_ctxt_init;
 
 	pva->sids[0] = nvpva_get_device_hwid(pdev, 0);
 	if (pva->sids[0] < 0) {
 		err =  pva->sids[0];
-		goto err_mss_init;
+		goto err_iommu_ctxt_init;
 	}
 
 	++(pva->sid_count);
@@ -1098,7 +1190,7 @@ static int pva_probe(struct platform_device *pdev)
 
 	if ((UINT_MAX - offset) < pdev->resource[0].start) {
 		err = -ENODEV;
-		goto err_mss_init;
+		goto err_iommu_ctxt_init;
 	}
 
 	nvpva_dbg_info(pva, "hwpm ip %s register", pdev->name);
@@ -1112,7 +1204,10 @@ static int pva_probe(struct platform_device *pdev)
 
 	return 0;
 
-err_mss_init:
+err_iommu_ctxt_init:
+	nvpva_syncpt_unit_interface_deinit(pdev);
+err_syncpt_xface_init:
+	nvhost_syncpt_unit_interface_deinit(pdev);
 err_isr_init:
 	nvpva_client_context_deinit(pva);
 err_client_ctx_init:
@@ -1146,6 +1241,7 @@ static int __exit pva_remove(struct platform_device *pdev)
 	pva_auth_allow_list_destroy(&pva->pva_auth_sys);
 	pva_auth_allow_list_destroy(&pva->pva_auth);
 	pva_free_task_status_buffer(pva);
+	nvpva_syncpt_unit_interface_deinit(pdev);
 	nvpva_client_context_deinit(pva);
 	nvpva_queue_deinit(pva->pool);
 	nvhost_client_device_release(pdev);
@@ -1153,7 +1249,6 @@ static int __exit pva_remove(struct platform_device *pdev)
 		free_irq(pva->irq[i], pva);
 
 	nvhost_module_deinit(pdev);
-
 	mutex_destroy(&pdata->lock);
 	mutex_destroy(&pva->mailbox_mutex);
 	mutex_destroy(&pva->ccq_mutex);
@@ -1212,11 +1307,23 @@ static int __init nvpva_init(void)
 
 	err = host1x_driver_register(&host1x_nvpva_driver);
 	if (err < 0)
-		return err;
-	err = platform_driver_register(&pva_driver);
-	if (err < 0)
-		host1x_driver_unregister(&host1x_nvpva_driver);
+		goto out;
 
+	err = platform_driver_register(&nvpva_iommu_context_dev_driver);
+	if (err < 0)
+		goto ctx_failed;
+
+	err = platform_driver_register(&pva_driver);
+	if (err)
+		goto pva_failed;
+
+	return err;
+
+pva_failed:
+	platform_driver_unregister(&nvpva_iommu_context_dev_driver);
+ctx_failed:
+	host1x_driver_unregister(&host1x_nvpva_driver);
+out:
 	return err;
 }
 
@@ -1224,6 +1331,7 @@ module_init(nvpva_init);
 static void __exit nvpva_exit(void)
 {
 	platform_driver_unregister(&pva_driver);
+	platform_driver_unregister(&nvpva_iommu_context_dev_driver);
 	host1x_driver_unregister(&host1x_nvpva_driver);
 }
 
