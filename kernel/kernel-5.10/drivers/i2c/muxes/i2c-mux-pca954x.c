@@ -593,8 +593,8 @@ pca954x_probe_skip_detect:
 		if (client->dev.of_node)
 			idle_disconnect_pd = true;
 
-		data->idle_state |= (idle_disconnect_pd ||
-				   data->idle_state) << num;
+		//data->idle_state |= (idle_disconnect_pd ||
+		//		   data->idle_state) << num;
 		ret = i2c_mux_add_adapter(muxc, force, num, class);
 		if (ret)
 			goto fail_cleanup;

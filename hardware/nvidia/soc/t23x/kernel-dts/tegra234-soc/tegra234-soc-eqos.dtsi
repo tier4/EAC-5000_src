@@ -17,6 +17,8 @@
 /*
  * tegra234-soc-eqos.dtsi: Ethernet QOS DTSI file.
  */
+#include <t234-common-cvb/tegra234-p3711-ethernet.dtsi>
+#include <t234-common-cvb/tegra234-p3737-eqos-pinmux.dtsi>
 
 / {
 	pinmux@2430000 {
