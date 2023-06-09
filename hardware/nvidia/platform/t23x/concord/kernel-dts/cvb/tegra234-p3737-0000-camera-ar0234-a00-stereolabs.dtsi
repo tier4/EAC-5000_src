@@ -1,0 +1,275 @@
+/*
+ * Copyright (c) 2018-2022, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+#include "t234-common-modules/tegra234-camera-ar0234-a00-stereolabs.dtsi"
+#include "dt-bindings/clock/tegra234-clock.h"
+
+
+#define CAM0_PWDN	TEGRA234_MAIN_GPIO(H, 6)
+#define CAM1_PWDN	TEGRA234_MAIN_GPIO(AC, 0)
+#define CAM2_PWDN	TEGRA234_MAIN_GPIO(H, 3)
+#define CAM3_PWDN	TEGRA234_MAIN_GPIO(AC, 1)
+#define CAMERA_I2C_MUX_BUS(x) (0x1E + x)
+
+/* camera control gpio definitions */
+
+/ {
+/*
+	gpio@2200000 {
+		gmsl_poc {
+			gpio-hog;
+			output-high;
+			gpios =  <CAM_POC_PWR 0>;
+			label = "poc_sel1";
+		};
+	};
+	*/
+
+	i2c@3180000 {
+		tca9543@72 {
+			compatible = "nxp,pca9543";
+			reg = <0x72>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+		    i2c-mux-idle-disconnect;
+			idle-state = <1>;
+			skip_mux_detect = "yes";
+			vif-supply = <&p3737_vdd_1v8_sys>;
+			vcc-supply = <&p3737_vdd_1v8_sys>;
+			vcc-pullup-supply = <&battery_reg>;
+			force_bus_start = <CAMERA_I2C_MUX_BUS(0)>; /* Force start of bus 30 */
+			status = "okay";
+			i2c-mux-idle-disconnect;
+
+			/* /dev/i2c-30/ */
+			i2c@0 {
+				reg = <0>;
+				i2c-mux,deselect-on-exit;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				/* deserializer MAX9296 at address 0x48*/
+				max929x_a@48 {
+					compatible = "stereolabs,max929x";
+					reg = <0x48>;  /* deserializer i2c_address */
+					channel = "a"; /* deserializer channel: one per deser */
+				};
+
+				/* ZEDX 0 Left Cam*/
+				zedx_left_0@18 {
+					status = "okay";
+					def-addr = <0x18>;
+					/* Define any required hw resources needed by driver */
+					/* ie. clocks, io pins, power sources */
+					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
+							<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
+					clock-names = "extperiph1", "pllp_grtba";
+					mclk = "extperiph1";
+					channel = "a";   /* deserializer channel */
+					mode = "master"; /* the master role is to initialize */
+							  /* all the serializers connected to the same */
+							  /* deserializer. -> one per ZEDX*/
+							  /* This master initializes the serializers */
+							  /* of ZEDX 0 and ZEDX 1. */
+					reset-gpio = <&tegra_main_gpio CAM0_PWDN GPIO_ACTIVE_HIGH>;
+					pwdn-gpios = <&tegra_main_gpio CAM0_PWDN GPIO_ACTIVE_HIGH>;
+					pwr-gpios = <&tegra_main_gpio CAM0_PWDN GPIO_ACTIVE_HIGH>;
+					has-eeprom;
+				};
+
+				/* ZEDX 0 Right Cam*/
+				zedx_right_0@10 {
+					status = "okay";
+					def-addr = <0x10>;
+					/* Define any required hw resources needed by driver */
+					/* ie. clocks, io pins, power sources */
+					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
+							<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
+					clock-names = "extperiph1", "pllp_grtba";
+					mclk = "extperiph1";
+					channel = "a";  /* deserializer channel */
+					mode = "slave"; /* the serializer of the ZEDX 0 is already */
+							 /* initialized */
+					has-eeprom;
+				};
+			};
+
+			/* /dev/i2c-31/ */
+			i2c@1 {
+				reg = <1>;
+				i2c-mux,deselect-on-exit;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				/* deserializer MAX9296 at address 0x48*/
+				max929x_b@48 {
+					compatible = "stereolabs,max929x";
+					reg = <0x48>;  /* deserializer i2c_address */
+					channel = "b"; /* deserializer channel: one per deser */
+				};
+
+				/* ZEDX 1 Left Cam*/
+				zedx_left_1@18 {
+					status = "okay";
+					def-addr = <0x18>;
+					/* Define any required hw resources needed by driver */
+					/* ie. clocks, io pins, power sources */
+					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
+							<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
+					clock-names = "extperiph1", "pllp_grtba";
+					mclk = "extperiph1";
+					channel = "b";  /* deserializer channel: same as ZEDX 0 */
+					mode = "master"; /* the serializer of the ZEDX 1 is */
+							 /* initialized at the same time as the*/
+							 /* serializer of the ZEDX 0 */
+					reset-gpio = <&tegra_main_gpio CAM1_PWDN GPIO_ACTIVE_HIGH>;
+					pwdn-gpios = <&tegra_main_gpio CAM1_PWDN GPIO_ACTIVE_HIGH>;
+					pwr-gpios = <&tegra_main_gpio CAM1_PWDN GPIO_ACTIVE_HIGH>;
+					has-eeprom;
+				};
+
+				/* ZEDX 1 Right Cam*/
+				zedx_right_1@10 {
+					status = "okay";
+					def-addr = <0x10>;
+					/* Define any required hw resources needed by driver */
+					/* ie. clocks, io pins, power sources */
+					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
+									<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
+					clock-names = "extperiph1", "pllp_grtba";
+					mclk = "extperiph1";
+					channel = "b"; /* deserializer channel: same as ZEDX 0 */
+					mode = "slave"; /* the serializer of the ZEDX 1 is */
+							 /* initialized at the same time as the*/
+							 /* serializer of the ZEDX 0 */
+					has-eeprom;
+				};
+			};
+		};
+
+		tca9543@73 {
+			compatible = "nxp,pca9543";
+			reg = <0x73>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			i2c-mux-idle-disconnect;
+			idle-state = <1>;
+			skip_mux_detect = "yes";
+			vif-supply = <&p3737_vdd_1v8_sys>;
+			vcc-supply = <&p3737_vdd_1v8_sys>;
+			vcc-pullup-supply = <&battery_reg>;
+			force_bus_start = <CAMERA_I2C_MUX_BUS(2)>; /* Force start of bus 32 */
+			i2c-mux-idle-disconnect;
+			status = "okay";
+			/* /dev/i2c-32/ */
+			i2c@0 {
+				reg = <0>;
+				i2c-mux,deselect-on-exit;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				i2c-mux-idle-disconnect;
+				/* deserializer MAX9296 at address 0x48*/
+				max929x_c@48 {
+					compatible = "stereolabs,max929x";
+					reg = <0x48>;  /* deserializer i2c_address */
+					channel = "c"; /* deserializer channel: one per deser */
+				};
+ 
+
+				/* ZEDX 2 Left Cam*/
+				zedx_left_2@18 {
+					status = "okay";
+					def-addr = <0x18>;
+					/* Define any required hw resources needed by driver */
+					/* ie. clocks, io pins, power sources */
+					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
+							<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
+					clock-names = "extperiph1", "pllp_grtba";
+					mclk = "extperiph1";
+					channel = "c";   /* deserializer channel */
+					mode = "master";
+					reset-gpio = <&tegra_main_gpio CAM2_PWDN GPIO_ACTIVE_HIGH>;
+					pwdn-gpios = <&tegra_main_gpio CAM2_PWDN GPIO_ACTIVE_HIGH>;
+					pwr-gpios = <&tegra_main_gpio CAM2_PWDN GPIO_ACTIVE_HIGH>;
+					has-eeprom;
+				};
+
+				/* ZEDX 2 Right Cam*/
+				zedx_right_2@10 {
+					status = "okay";
+					def-addr = <0x10>;
+					/* Define any required hw resources needed by driver */
+					/* ie. clocks, io pins, power sources */
+					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
+									<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
+					clock-names = "extperiph1", "pllp_grtba";
+					mclk = "extperiph1";
+					channel = "c";  /* deserializer channel */
+					mode = "slave";
+					has-eeprom;
+				};
+			};
+
+			/* /dev/i2c-33/ */
+			i2c@1 {
+				reg = <1>;
+				i2c-mux,deselect-on-exit;
+				#address-cells = <1>;
+				#size-cells = <0>;
+ 				i2c-mux-idle-disconnect;
+				/* deserializer MAX9296 at address 0x48*/
+				max929x_d@48 {
+					compatible = "stereolabs,max929x";
+					reg = <0x48>;  /* deserializer i2c_address */
+					channel = "d"; /* deserializer channel: one per deser */
+				};
+
+				/* ZEDX 1 Left Cam*/
+				zedx_left_3@18 {
+					status = "okay";
+					def-addr = <0x18>;
+					/* Define any required hw resources needed by driver */
+					/* ie. clocks, io pins, power sources */
+					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
+							<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
+					clock-names = "extperiph1", "pllp_grtba";
+					mclk = "extperiph1";
+					channel = "d";  /* deserializer channel: same as MAX associated */
+					mode = "master";
+					reset-gpio = <&tegra_main_gpio CAM3_PWDN GPIO_ACTIVE_HIGH>;
+					pwdn-gpios = <&tegra_main_gpio CAM3_PWDN GPIO_ACTIVE_HIGH>;
+					pwr-gpios = <&tegra_main_gpio CAM3_PWDN GPIO_ACTIVE_HIGH>;
+					has-eeprom;
+				};
+
+				/* ZEDX 1 Right Cam*/
+				zedx_right_3@10 {
+					status = "okay";
+					def-addr = <0x10>;
+					/* Define any required hw resources needed by driver */
+					/* ie. clocks, io pins, power sources */
+					clocks = <&bpmp_clks TEGRA234_CLK_EXTPERIPH1>,
+									<&bpmp_clks TEGRA234_CLK_EXTPERIPH1>;
+					clock-names = "extperiph1", "pllp_grtba";
+					mclk = "extperiph1";
+					channel = "d"; /* deserializer channel: same as MAX associated*/
+					mode = "slave";
+					has-eeprom;
+				};
+			};
+		};
+	};
+};

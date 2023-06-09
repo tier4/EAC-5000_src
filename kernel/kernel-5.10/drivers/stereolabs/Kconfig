@@ -1,0 +1,9 @@
+if VIDEO_V4L2
+
+menu "Stereolabs Drivers"
+  source "drivers/stereolabs/max9296/Kconfig"
+  source "drivers/stereolabs/max96712/Kconfig"
+  source "drivers/stereolabs/zedx/Kconfig"
+endmenu
+
+endif

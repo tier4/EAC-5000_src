@@ -22,6 +22,7 @@
 #include <tegra234-soc/mods-simple-bus.dtsi>
 //#include "cvb/tegra234-p3737-camera-modules.dtsi"
 #include "cvb/tegra234-p3737-0000-camera-imx390-a00_otocam.dtsi"
+//#include "cvb/tegra234-p3737-0000-camera-ar0234-a00-stereolabs.dtsi"
 #include <t234-common-cvm/tegra234-cpuidle.dtsi>
 #include <t234-common-cvm/tegra234-thermal.dtsi>
 #include <t234-common-cvm/tegra234-thermal-cooling.dtsi>
