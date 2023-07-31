@@ -282,12 +282,12 @@ static int pca954x_deselect_mux(struct i2c_mux_core *muxc, u32 chan)
 		/* Set the mux back to a predetermined channel */
 		return pca954x_select_chan(muxc, idle_state);
 
-	if (idle_state == MUX_IDLE_DISCONNECT) {
+	//if (idle_state == MUX_IDLE_DISCONNECT) {
 		/* Deselect active channel */
 		data->last_chan = 0;
 		return pca954x_reg_write(muxc->parent, client,
 					 data->last_chan);
-	}
+	//}
 
 	/* otherwise leave as-is */
 
@@ -593,8 +593,8 @@ pca954x_probe_skip_detect:
 		if (client->dev.of_node)
 			idle_disconnect_pd = true;
 
-		//data->idle_state |= (idle_disconnect_pd ||
-		//		   data->idle_state) << num;
+		data->idle_state |= (idle_disconnect_pd ||
+				   data->idle_state) << num;
 		ret = i2c_mux_add_adapter(muxc, force, num, class);
 		if (ret)
 			goto fail_cleanup;
