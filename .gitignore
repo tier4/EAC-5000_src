@@ -1,2 +1,4 @@
 *.o
 *.cmd
+*.tbz2
+*.sha1sum
