@@ -168,6 +168,6 @@
 
 /* SPIs which are available for PCIe MSI interrupts */
 #define GIC_SPI_MSI_BASE		608
-#define GIC_SPI_MSI_SIZE		70
+#define GIC_SPI_MSI_SIZE		352
 
 #endif /* _DT_BINDINGS_INTERRUPT_CONTROLLER_TEGRA_T23X_AGIC_H */
