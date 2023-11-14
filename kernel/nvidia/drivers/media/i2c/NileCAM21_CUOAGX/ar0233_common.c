@@ -655,17 +655,6 @@ static int cam_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	if (priv->power.state == SWITCH_OFF)
 		return 0;
-	
-	if(ctrl->id == V4L2_CID_CUSTOM_TRIGGER){
-		if(ctrl->val == 1 && ctrl->val != priv->trig_val){
-				priv->trig_val = 1;
-				toggle_gpio(priv->trigger_gpio, 1);
-		} else {
-				toggle_gpio(priv->trigger_gpio, 0);
-				priv->trig_val = 0;
-		}
-		return 0;
-	}
 
 #ifdef AR0233_HDR_SYNC
 	if(ctrl->id == V4L2_CID_HDR || ctrl->id == V4L2_CID_FRAME_SYNC){
@@ -700,7 +689,7 @@ static int cam_s_ctrl(struct v4l2_ctrl *ctrl)
 		}
 		if( priv->change_sync == 1 && !is_sync_changed){
 			dev_info(&client->dev," Recalibrating PWM For HDR mode \n");
-			pca9685_init(client,28);
+			//pca9685_init(client,28);
 			is_sync_changed = 1;
 			priv->change_sync = 0;
 		}
@@ -708,7 +697,7 @@ static int cam_s_ctrl(struct v4l2_ctrl *ctrl)
 			is_sync_changed = 0;
 			dev_info(&client->dev," Recalibrating PWM For SDR mode \n");
 			priv->change_sync = 0;
-			pca9685_init(client,30);
+			//pca9685_init(client,30);
 		}
 	}
 #endif
@@ -1137,7 +1126,7 @@ static s32 serdes_config_init(struct i2c_client *client,struct cam *priv)
 		priv->tb_id = SIOA_TB_ID;
 
 		/* Enabling high priority gpio reception for input trigger */ 
-		if((serdes_write_16b_reg(client, priv->ser_addr, 0x02D3, 0xC4)) < 0)
+		if((serdes_write_16b_reg(client, priv->ser_addr, 0x02C4, 0xC4)) < 0)
 		{
 			dev_err (&client->dev, "%s(%d): Failed\n",
 					__func__, __LINE__);
@@ -3446,33 +3435,6 @@ skip:
 	msleep(1);
 	toggle_gpio(reset_gpio, 1);
 #endif
-
-	if (Gtrigger_gpio == 0) {
-		Gtrigger_gpio = of_get_named_gpio(node, "trigger-gpios", 0);
-		if(Gtrigger_gpio < 0) {
-			dev_err(&client->dev, "Unable to toggle GPIO\n");
-			return -EINVAL;
-		}
-
-		err = gpio_request(Gtrigger_gpio, "trigger-sel");
-		if (err < 0) {
-			dev_err(&client->dev,"%s[%d]:GPIO reset Fail, err:%d",__func__,__LINE__, err);
-			return -EINVAL;
-		}
-	
-	}
-	err = of_property_read_string(node, "default-trigger", &str_trig);
-	if (!err) {
-		if (!strcmp(str_trig, "internal")){
-			toggle_gpio(Gtrigger_gpio, 0);
-		}
-		else if (!strcmp(str_trig, "external")) {
-			toggle_gpio(Gtrigger_gpio, 1);	
-		}
-	} else {
-		toggle_gpio(Gtrigger_gpio, 0);
-	}
-
 	common_data =
 		devm_kzalloc(&client->dev,
 				sizeof(struct camera_common_data), GFP_KERNEL);
@@ -3855,11 +3817,11 @@ skip:
 	dev_info(&client->dev,"Detected AR0233 sensor\n");
 
 	/*Initialisation And Calibration of PWM Chip */
-	err = pca9685_init(client,30);
-	if(err){
-		dev_err(&client->dev, "unable to init pca9685\n");
-		return err;
-	}
+	//err = pca9685_init(client,30);
+	//if(err){
+	//	dev_err(&client->dev, "unable to init pca9685\n");
+	//	return err;
+	//}
 
 #ifdef AR0233_HDR_SYNC
 	num_cam++;
@@ -3899,16 +3861,16 @@ static int cam_remove(struct i2c_client *client)
 		msleep(100);
 	}
 
-	trigger_gpio = of_get_named_gpio(node, "trigger-gpios", 0);
-	debug_printk("trigger = %x \n",trigger_gpio);
-	if(trigger_gpio < 0) {
-		dev_err(&client->dev, "Unable to toggle GPIO\n");
-		return -EINVAL;
-	}
+	//trigger_gpio = of_get_named_gpio(node, "trigger-gpios", 0);
+	//debug_printk("trigger = %x \n",trigger_gpio);
+	//if(trigger_gpio < 0) {
+	//	dev_err(&client->dev, "Unable to toggle GPIO\n");
+	//	return -EINVAL;
+	//}
 
 	v4l2_ctrl_handler_free(&priv->ctrl_handler);
 	cam_power_put(priv);
-	gpio_free(trigger_gpio);
+	//gpio_free(trigger_gpio);
 	camera_common_remove_debugfs(s_data);
 
 	mutex_destroy(&priv->mcu_i2c_mutex);

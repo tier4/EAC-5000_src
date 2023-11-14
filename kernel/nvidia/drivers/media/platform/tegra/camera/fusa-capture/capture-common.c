@@ -330,8 +330,8 @@ void destroy_buffer_table(
 	struct hlist_node *next;
 	struct capture_mapping *pin;
 
-	if (unlikely(tab == NULL))
-		return;
+//	if (unlikely(tab == NULL))
+//		return;
 
 	write_lock(&tab->hlock);
 
