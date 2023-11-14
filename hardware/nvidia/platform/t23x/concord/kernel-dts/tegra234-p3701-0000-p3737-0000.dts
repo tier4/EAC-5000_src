@@ -20,9 +20,10 @@
 #include "tegra234-dcb-p3701-0000-a02-p3737-0000-a01.dtsi"
 #include <tegra234-soc/mods-simple-bus.dtsi>
 //#include "cvb/tegra234-p3737-camera-modules.dtsi"
-#include "cvb/tegra234-p3737-0000-camera-imx390-a00_otocam.dtsi"
+//#include "cvb/tegra234-p3737-0000-camera-imx390-a00_otocam.dtsi"
 //#include "cvb/tegra234-p3737-0000-camera-imx390-a00_4otocam+2stereolabs.dtsi"
 //#include "cvb/tegra234-p3737-0000-camera-ar0234-a00-stereolabs.dtsi"
+#include "cvb/tegra234-p3737-0000-camera-tier4.dtsi"
 #include <t234-common-cvm/tegra234-cpuidle.dtsi>
 #include <t234-common-cvm/tegra234-thermal.dtsi>
 #include <t234-common-cvm/tegra234-thermal-cooling.dtsi>
@@ -36,6 +37,8 @@
 	nvidia,dtbbuildtime = __DATE__, __TIME__;
 
 	compatible = "nvidia,p3737-0000+p3701-0000", "nvidia,tegra234", "nvidia,tegra23x";
+	model = "EAC-5000 Jetson AGX Orin";
+        nsdk_version = "v1.0.0.0";
 
 	nvsciipc-kernel {
 		compatible = "nvidia,nvsciipc";

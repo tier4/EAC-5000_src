@@ -1,0 +1,2375 @@
+/*
+ * Copyright (c) 2018-2021, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/* TIER4 + MAX9295 + MAX9296 + AGX ORIN */
+#define BUS_WIDTH 4
+#define NUM_LANES 4
+#define MODE_NUMLANES "4"
+#define TIER4_PIX_CLK_HZ "74250000"
+//#define TIER4_PIX_CLK_HZ "94500000"
+//#define TIER4_SERDES_PIX_CLK_HZ "350000000"
+#define TIER4_SERDES_PIX_CLK_HZ "375000000"
+
+/ {
+	tegra-capture-vi {
+		num-channels = <8>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				tier4_vi_in0: endpoint {
+					vc-id = <0>;
+					port-index = <0>;
+					bus-width = <BUS_WIDTH>;
+					remote-endpoint = <&tier4_csi_out0>;
+				};
+			};
+			port@1 {
+				reg = <1>;
+				tier4_vi_in1: endpoint {
+					vc-id = <1>;
+					port-index = <0>;
+					bus-width = <BUS_WIDTH>;
+					remote-endpoint = <&tier4_csi_out1>;
+				};
+			};
+			port@2 {
+				reg = <2>;
+				tier4_vi_in2: endpoint {
+					vc-id = <0>;
+					port-index = <2>;
+					bus-width = <BUS_WIDTH>;
+					remote-endpoint = <&tier4_csi_out2>;
+				};
+			};
+			port@3 {
+				reg = <3>;
+				tier4_vi_in3: endpoint {
+					vc-id = <1>;
+					port-index = <2>;
+					bus-width = <BUS_WIDTH>;
+					remote-endpoint = <&tier4_csi_out3>;
+				};
+			};
+			port@4 {
+				reg = <4>;
+				tier4_vi_in4: endpoint {
+					vc-id = <0>;
+					port-index = <4>;
+					bus-width = <BUS_WIDTH>;
+					remote-endpoint = <&tier4_csi_out4>;
+				};
+			};
+			port@5 {
+				reg = <5>;
+				tier4_vi_in5: endpoint {
+					vc-id = <1>;
+					port-index = <4>;
+					bus-width = <BUS_WIDTH>;
+					remote-endpoint = <&tier4_csi_out5>;
+				};
+			};
+			port@6 {
+				reg = <6>;
+				tier4_vi_in6: endpoint {
+					vc-id = <0>;
+					port-index = <5>;
+					bus-width = <BUS_WIDTH>;
+					remote-endpoint = <&tier4_csi_out6>;
+				};
+			};
+			port@7 {
+				reg = <7>;
+				tier4_vi_in7: endpoint {
+					vc-id = <1>;
+					port-index = <5>;
+					bus-width = <BUS_WIDTH>;
+					remote-endpoint = <&tier4_csi_out7>;
+				};
+			};
+		};
+	};
+
+	host1x@13e00000 {
+		nvcsi@15a00000 {
+			num-channels = <8>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			channel@0 {
+				reg = <0>;
+				status = "okay";
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						status = "okay";
+						tier4_csi_in0: endpoint@0 {
+							port-index = <0>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&isx021_out0>;
+							status = "okay";
+						};
+					};
+					port@1 {
+						reg = <1>;
+						status = "okay";
+						tier4_csi_out0: endpoint@1 {
+							remote-endpoint = <&tier4_vi_in0>;
+							status = "okay";
+						};
+					};
+				};
+			};
+			channel@1 {
+				reg = <1>;
+				status = "okay";
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						status = "okay";
+						tier4_csi_in1: endpoint@2 {
+							port-index = <0>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&isx021_out1>;
+							status = "okay";
+						};
+					};
+					port@1 {
+						reg = <1>;
+						status = "okay";
+						tier4_csi_out1: endpoint@3 {
+							remote-endpoint = <&tier4_vi_in1>;
+							status = "okay";
+						};
+					};
+				};
+			};
+			channel@2 {
+				reg = <2>;
+				status = "okay";
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						status = "okay";
+						tier4_csi_in2: endpoint@4 {
+							port-index = <2>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&isx021_out2>;
+							status = "okay";
+						};
+					};
+					port@1 {
+						reg = <1>;
+						status = "okay";
+						tier4_csi_out2: endpoint@5 {
+							remote-endpoint = <&tier4_vi_in2>;
+							status = "okay";
+						};
+					};
+				};
+			};
+			channel@3 {
+				reg = <3>;
+				status = "okay";
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						status = "okay";
+						tier4_csi_in3: endpoint@6 {
+							port-index = <2>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&isx021_out3>;
+							status = "okay";
+						};
+					};
+					port@1 {
+						reg = <1>;
+						status = "okay";
+						tier4_csi_out3: endpoint@7 {
+							remote-endpoint = <&tier4_vi_in3>;
+							status = "okay";
+						};
+					};
+				};
+			};
+			channel@4 {
+				reg = <4>;
+				status = "okay";
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						status = "okay";
+						tier4_csi_in4: endpoint@8 {
+							port-index = <4>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&isx021_out4>;
+							status = "okay";
+						};
+					};
+					port@1 {
+						reg = <1>;
+						status = "okay";
+						tier4_csi_out4: endpoint@9 {
+							remote-endpoint = <&tier4_vi_in4>;
+							status = "okay";
+						};
+					};
+				};
+			};
+			channel@5 {
+				reg = <5>;
+				status = "okay";
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						status = "okay";
+						tier4_csi_in5: endpoint@10 {
+							port-index = <4>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&isx021_out5>;
+							status = "okay";
+						};
+					};
+					port@1 {
+						reg = <1>;
+						status = "okay";
+						tier4_csi_out5: endpoint@11 {
+							remote-endpoint = <&tier4_vi_in5>;
+							status = "okay";
+						};
+					};
+				};
+			};
+			channel@6 {
+				reg = <6>;
+				status = "okay";
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						status = "okay";
+						tier4_csi_in6: endpoint@12 {
+							port-index = <6>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&isx021_out6>;
+							status = "okay";
+						};
+					};
+					port@1 {
+						reg = <1>;
+						status = "okay";
+						tier4_csi_out6: endpoint@13 {
+							remote-endpoint = <&tier4_vi_in6>;
+							status = "okay";
+						};
+					};
+				};
+			};
+			channel@7 {
+				reg = <7>;
+				status = "okay";
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						status = "okay";
+						tier4_csi_in7: endpoint@14 {
+							port-index = <6>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&isx021_out7>;
+							status = "okay";
+						};
+					};
+					port@1 {
+						reg = <1>;
+						status = "okay";
+						tier4_csi_out7: endpoint@15 {
+							remote-endpoint = <&tier4_vi_in7>;
+							status = "okay";
+						};
+					};
+				};
+			};
+		};
+	};
+
+i2c@3180000 {
+	tca9543@72 {
+		i2c@0 {
+			isx021_a@1b {
+				//cvb
+				status = "okay";
+				def-addr = <0x1a>;
+
+				// common module
+				compatible = "nvidia,tier4_isx021";
+				reg = <0x1b>;
+
+				/* Physical dimensions of sensor */
+				physical_w = "15.0";
+				physical_h = "12.5";
+				reg_mux = <0>;
+				sensor_model ="isx021";
+				fsync-mode = "false";
+				distortion-correction = "false";
+				auto-exposure = "true";
+
+				/* Defines number of frames to be dropped by driver internally after applying */
+				/* sensor crop settings. Some sensors send corrupt frames after applying */
+				/* crop co-ordinates */
+				post_crop_frame_drop = "0";
+
+				/* Convert Gain to unit of dB (decibel) befor passing to kernel driver */
+				use_decibel_gain = "true";
+
+				/* enable CID_SENSOR_MODE_ID for sensor modes selection */
+				use_sensor_mode_id = "true";
+				//use_sensor_mode_id = "false";
+
+				mode0 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS*/
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_a";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1280";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode1 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_a";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1281";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode2 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_a";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1294";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode3 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front and Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_a";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1295";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+
+						isx021_out0: endpoint {
+							vc-id = <0>;
+							port-index = <0>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&tier4_csi_in0>;
+						};
+					};
+				};
+
+				gmsl-link { /* isx021_a@1b */
+					src-csi-port = "b";           /* Port at which sensor is connected to its serializer device. */
+					dst-csi-port = "a";           /* Destination CSI port on the Jetson side, connected at deserializer. */
+					serdes-csi-link = "a";        /* GMSL link sensor/serializer connected */
+					csi-mode = "1x4";             /*  to sensor CSI mode. */
+					st-vc = <0>;                  /* Sensor source default VC ID: 0 unless overridden by sensor. */
+					vc-id = <0>;                  /* Destination VC ID, assigned to sensor stream by deserializer. */
+					num-lanes = <NUM_LANES>;              /* Number of CSI lanes used. */
+					streams = "ued-u1", "yuv8";   /* Types of streams sensor is streaming. */
+				};
+
+			}; // End of isx021_a@1b   
+
+			isx021_b@1c {
+				//cvb
+				status = "okay";
+				def-addr = <0x1a>;
+
+				// common module
+				compatible = "nvidia,tier4_isx021";
+				reg = <0x1c>;
+
+				/* Physical dimensions of sensor */
+				physical_w = "15.0";
+				physical_h = "12.5";
+				reg_mux = <0>;
+				sensor_model ="isx021";
+				fsync-mode = "false";
+				distortion-correction = "false";
+				auto-exposure = "true";
+
+				/* Defines number of frames to be dropped by driver internally after applying */
+				/* sensor crop settings. Some sensors send corrupt frames after applying */
+				/* crop co-ordinates */
+				post_crop_frame_drop = "0";
+
+				/* Convert Gain to unit of dB (decibel) befor passing to kernel driver */
+				use_decibel_gain = "true";
+
+				/* enable CID_SENSOR_MODE_ID for sensor modes selection */
+				use_sensor_mode_id = "true";
+				//use_sensor_mode_id = "false";
+
+				mode0 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS*/
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_a";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1280";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode1 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_a";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1281";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode2 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_a";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1294";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode3 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front and Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_a";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1295";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						isx021_out1: endpoint {
+							vc-id = <1>;
+							port-index = <0>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&tier4_csi_in1>;
+						};
+					};
+				};
+
+				gmsl-link { /* isx021_b@1c */
+					src-csi-port = "b";           /* Port at which sensor is connected to its serializer device. */
+					dst-csi-port = "a";           /* Destination CSI port on the Jetson side, connected at deserializer. */
+					serdes-csi-link = "b";        /* GMSL link sensor/serializer connected */
+					csi-mode = "1x4";             /*  to sensor CSI mode. */
+					st-vc = <0>;                  /* Sensor source default VC ID: 0 unless overridden by sensor. */
+					vc-id = <1>;                  /* Destination VC ID, assigned to sensor stream by deserializer. */
+					num-lanes = <NUM_LANES>;              /* Number of CSI lanes used. */
+					streams = "ued-u1", "yuv8";   /* Types of streams sensor is streaming. */
+				};
+
+			}; // End of isx021_b@1c
+
+		};// End of i2c@0	
+ 
+		i2c@1 {
+			i2c-mux,deselect-on-exit;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			reg = <1>;
+
+			isx021_c@1b {
+				//cvb
+				status = "okay";
+				def-addr = <0x1a>;
+
+				// common modul;e
+				compatible = "nvidia,tier4_isx021";
+				reg = <0x1b>;
+
+				/* Physical dimensions of sensor */
+				physical_w = "15.0";
+				physical_h = "12.5";
+				reg_mux = <1>;
+
+				sensor_model ="isx021";
+				fsync-mode = "false";
+				distortion-correction = "false";
+				auto-exposure = "true";
+
+				/* Defines number of frames to be dropped by driver internally after applying */
+				/* sensor crop settings. Some sensors send corrupt frames after applying */
+				/* crop co-ordinates */
+				post_crop_frame_drop = "0";
+
+				/* Convert Gain to unit of dB (decibel) befor passing to kernel driver */
+				use_decibel_gain = "true";
+
+				/* enable CID_SENSOR_MODE_ID for sensor modes selection */
+				use_sensor_mode_id = "true";
+				//use_sensor_mode_id = "false";
+
+				mode0 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS*/
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_c";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1280";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode1 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_c";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1281";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode2 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_c";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1294";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode3 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front and Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_c";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1295";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						isx021_out2: endpoint {
+							vc-id = <0>;
+							port-index = <2>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&tier4_csi_in2>;
+						};
+					};
+				};
+
+				gmsl-link { /* isx021_c@1b */
+					src-csi-port = "b";           /* Port at which sensor is connected to its serializer device. */
+					dst-csi-port = "a";           /* Destination CSI port on the Jetson side, connected at deserializer. */
+					serdes-csi-link = "a";        /* GMSL link sensor/serializer connected */
+					csi-mode = "1x4";             /*  to sensor CSI mode. */
+					st-vc = <0>;                  /* Sensor source default VC ID: 0 unless overridden by sensor. */
+					vc-id = <0>;                  /* Destination VC ID, assigned to sensor stream by deserializer. */
+					num-lanes = <NUM_LANES>;              /* Number of CSI lanes used. */
+					streams = "ued-u1", "yuv8";   /* Types of streams sensor is streaming. */
+				};
+
+			}; // End of isx021_c@1b
+
+			isx021_d@1c {
+				//cvb
+				status = "okay";
+				def-addr = <0x1a>;
+
+				// common modul;e
+				compatible = "nvidia,tier4_isx021";
+				reg = <0x1c>;
+
+				/* Physical dimensions of sensor */
+				physical_w = "15.0";
+				physical_h = "12.5";
+				reg_mux = <1>;
+				sensor_model ="isx021";
+				fsync-mode = "false";
+				distortion-correction = "false";
+				auto-exposure = "true";
+
+				/* Defines number of frames to be dropped by driver internally after applying */
+				/* sensor crop settings. Some sensors send corrupt frames after applying */
+				/* crop co-ordinates */
+				post_crop_frame_drop = "0";
+
+				/* Convert Gain to unit of dB (decibel) befor passing to kernel driver */
+				use_decibel_gain = "true";
+
+				/* enable CID_SENSOR_MODE_ID for sensor modes selection */
+				use_sensor_mode_id = "true";
+				//use_sensor_mode_id = "false";
+
+				mode0 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS*/
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_c";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1280";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+		
+				mode1 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_c";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1281";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode2 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_c";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1294";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode3 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front and Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_c";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1295";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+	
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						isx021_out3: endpoint {
+							vc-id = <1>;
+							port-index = <2>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&tier4_csi_in3>;
+						};
+					};
+				};
+
+				gmsl-link { /* isx021_d@1c */
+					src-csi-port = "b";           /* Port at which sensor is connected to its serializer device. */
+					dst-csi-port = "a";           /* Destination CSI port on the Jetson side, connected at deserializer. */
+					serdes-csi-link = "b";        /* GMSL link sensor/serializer connected */
+					csi-mode = "1x4";             /*  to sensor CSI mode. */
+					st-vc = <0>;                  /* Sensor source default VC ID: 0 unless overridden by sensor. */
+					vc-id = <1>;                  /* Destination VC ID, assigned to sensor stream by deserializer. */
+					num-lanes = <NUM_LANES>;              /* Number of CSI lanes used. */
+					streams = "ued-u1", "yuv8";   /* Types of streams sensor is streaming. */
+				};
+
+			}; // End of isx021_d@1c
+		}; // End of i2c@1
+	}; // End of tca9543@72
+
+	tca9543@73 {
+		i2c@0 {
+			i2c-mux,deselect-on-exit;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			reg = <0>;
+
+			isx021_e@1b {
+				//cvb
+				status = "okay";
+				def-addr = <0x1a>;
+
+				// common modul;e
+				compatible = "nvidia,tier4_isx021";
+				reg = <0x1b>;
+
+				/* Physical dimensions of sensor */
+				physical_w = "15.0";
+				physical_h = "12.5";
+				reg_mux = <2>;
+				sensor_model ="isx021";
+				fsync-mode = "false";
+				distortion-correction = "false";
+				auto-exposure = "true";
+
+				/* Defines number of frames to be dropped by driver internally after applying */
+				/* sensor crop settings. Some sensors send corrupt frames after applying */
+				/* crop co-ordinates */
+				post_crop_frame_drop = "0";
+
+				/* Convert Gain to unit of dB (decibel) befor passing to kernel driver */
+				use_decibel_gain = "true";
+
+				/* enable CID_SENSOR_MODE_ID for sensor modes selection */
+				use_sensor_mode_id = "true";
+				//use_sensor_mode_id = "false";
+
+				mode0 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS*/
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_e";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1280";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode1 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_e";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1281";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode2 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_e";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1294";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode3 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front and Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_e";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1295";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						isx021_out4: endpoint {
+							vc-id = <0>;
+							port-index = <4>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&tier4_csi_in4>;
+						};
+					};
+				};
+
+				gmsl-link { /* isx021_e@1b */
+					src-csi-port = "b";           /* Port at which sensor is connected to its serializer device. */
+					dst-csi-port = "a";           /* Destination CSI port on the Jetson side, connected at deserializer. */
+					serdes-csi-link = "a";        /* GMSL link sensor/serializer connected */
+					csi-mode = "1x4";             /*  to sensor CSI mode. */
+					st-vc = <0>;                  /* Sensor source default VC ID: 0 unless overridden by sensor. */
+					vc-id = <0>;                  /* Destination VC ID, assigned to sensor stream by deserializer. */
+					num-lanes = <NUM_LANES>;              /* Number of CSI lanes used. */
+					streams = "ued-u1", "yuv8";   /* Types of streams sensor is streaming. */
+				};
+
+                        }; // End of isx021_e@1b
+
+			isx021_f@1c {
+				//cvb
+				status = "okay";
+				def-addr = <0x1a>;
+
+				// common modul;e
+				compatible = "nvidia,tier4_isx021";
+				reg = <0x1c>;
+
+				/* Physical dimensions of sensor */
+				physical_w = "15.0";
+				physical_h = "12.5";
+				reg_mux = <2>;
+
+				sensor_model ="isx021";
+				fsync-mode = "false";
+				distortion-correction = "false";
+				auto-exposure = "true";
+
+				/* Defines number of frames to be dropped by driver internally after applying */
+				/* sensor crop settings. Some sensors send corrupt frames after applying */
+				/* crop co-ordinates */
+				post_crop_frame_drop = "0";
+
+				/* Convert Gain to unit of dB (decibel) befor passing to kernel driver */
+				use_decibel_gain = "true";
+
+				/* enable CID_SENSOR_MODE_ID for sensor modes selection */
+				use_sensor_mode_id = "true";
+				//use_sensor_mode_id = "false";
+
+				mode0 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS*/
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_e";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1280";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode1 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_e";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1281";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode2 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_e";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1294";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode3 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front and Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_e";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1295";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						isx021_out5: endpoint {
+							vc-id = <1>;
+							port-index = <4>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&tier4_csi_in5>;
+						};
+					};
+				};
+
+				gmsl-link { /* isx021_f@1c */
+					src-csi-port = "b";           /* Port at which sensor is connected to its serializer device. */
+					dst-csi-port = "a";           /* Destination CSI port on the Jetson side, connected at deserializer. */
+					serdes-csi-link = "b";        /* GMSL link sensor/serializer connected */
+					csi-mode = "1x4";             /*  to sensor CSI mode. */
+					st-vc = <0>;                  /* Sensor source default VC ID: 0 unless overridden by sensor. */
+					vc-id = <1>;                  /* Destination VC ID, assigned to sensor stream by deserializer. */
+					num-lanes = <NUM_LANES>;              /* Number of CSI lanes used. */
+					streams = "ued-u1", "yuv8";   /* Types of streams sensor is streaming. */
+				};
+
+			}; // End of isx021_f@1c
+		}; // End of i2c@0
+
+		i2c@1 {
+			i2c-mux,deselect-on-exit;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			reg = <1>;
+
+			isx021_g@1b {
+				//cvb
+				status = "okay";
+				def-addr = <0x1a>;
+
+				// common modul;e
+				compatible = "nvidia,tier4_isx021";
+				reg = <0x1b>;
+
+				/* Physical dimensions of sensor */
+				physical_w = "15.0";
+				physical_h = "12.5";
+				reg_mux = <3>;
+
+				sensor_model ="isx021";
+				fsync-mode = "false";
+				distortion-correction = "false";
+				auto-exposure = "true";
+
+				/* Defines number of frames to be dropped by driver internally after applying */
+				/* sensor crop settings. Some sensors send corrupt frames after applying */
+				/* crop co-ordinates */
+				post_crop_frame_drop = "0";
+
+				/* Convert Gain to unit of dB (decibel) befor passing to kernel driver */
+				use_decibel_gain = "true";
+
+				/* enable CID_SENSOR_MODE_ID for sensor modes selection */
+				use_sensor_mode_id = "true";
+				//use_sensor_mode_id = "false";
+				
+				mode0 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS*/
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_g";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1280";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333";           /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode1 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_g";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1281";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode2 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_g";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1294";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode3 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front and Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_g";
+					vc_id = "0";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1295";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						isx021_out6: endpoint {
+							vc-id = <0>;
+							port-index = <6>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&tier4_csi_in6>;
+						};
+					};
+				};
+
+				gmsl-link {
+					src-csi-port = "b";           /* Port at which sensor is connected to its serializer device. */
+					dst-csi-port = "a";           /* Destination CSI port on the Jetson side, connected at deserializer. */
+					serdes-csi-link = "a";        /* GMSL link sensor/serializer connected */
+					csi-mode = "1x4";             /*  to sensor CSI mode. */
+					st-vc = <0>;                  /* Sensor source default VC ID: 0 unless overridden by sensor. */
+					vc-id = <0>;                  /* Destination VC ID, assigned to sensor stream by deserializer. */
+					num-lanes = <NUM_LANES>;              /* Number of CSI lanes used. */
+					streams = "ued-u1", "yuv8";   /* Types of streams sensor is streaming. */
+				};
+
+			}; // End of isx021_g@1b
+				
+			isx021_h@1c {
+				//cvb
+				status = "okay";
+				def-addr = <0x1a>;
+
+				// common modul;e
+				compatible = "nvidia,tier4_isx021";
+				reg = <0x1c>;
+
+				/* Physical dimensions of sensor */
+				physical_w = "15.0";
+				physical_h = "12.5";
+				reg_mux = <3>;
+
+				sensor_model ="isx021";
+				fsync-mode = "false";
+				distortion-correction = "false";
+				auto-exposure = "true";
+
+				/* Defines number of frames to be dropped by driver internally after applying */
+				/* sensor crop settings. Some sensors send corrupt frames after applying */
+				/* crop co-ordinates */
+				post_crop_frame_drop = "0";
+
+				/* Convert Gain to unit of dB (decibel) befor passing to kernel driver */
+				use_decibel_gain = "true";
+
+				/* enable CID_SENSOR_MODE_ID for sensor modes selection */
+				use_sensor_mode_id = "true";
+				//use_sensor_mode_id = "false";
+
+				mode0 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS*/
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_g";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1280";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3";  /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode1 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_g";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1281";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode2 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_g";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1294";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333"; /* us */
+					embedded_metadata_height = "0";
+				};
+
+				mode3 {
+					/*mode ISX021_MODE_1920X1280_CROP_30FPS  for Front and Rear Embedded data */
+					mclk_khz = "24000";
+					num_lanes = MODE_NUMLANES;
+					tegra_sinterface = "serial_g";
+					vc_id = "1";
+					discontinuous_clk = "no";
+					dpcm_enable = "false";
+					cil_settletime = "0";
+					dynamic_pixel_bit_depth = "16";
+					csi_pixel_bit_depth = "16";
+					mode_type = "yuv";
+					pixel_phase = "uyvy";
+
+					active_w = "1920";
+					active_h = "1295";
+					readout_orientation = "0";
+					line_length = "2250";
+					inherent_gain = "1";
+
+					pix_clk_hz = TIER4_PIX_CLK_HZ;
+					serdes_pix_clk_hz = TIER4_SERDES_PIX_CLK_HZ;
+
+					gain_factor = "10";
+					min_gain_val = "0"; /* dB */
+					max_gain_val = "300"; /* dB */
+					step_gain_val = "3"; /* 0.3 */
+					default_gain = "0";
+					min_hdr_ratio = "1";
+					max_hdr_ratio = "1";
+					framerate_factor = "1000000";
+					min_framerate = "30000000";
+					max_framerate = "30000000";
+					step_framerate = "1";
+					default_framerate = "30000000";
+					exposure_factor = "1000000";
+					min_exp_time = "24"; /* us 1 line */
+					max_exp_time = "33333";
+					step_exp_time = "1";
+					default_exp_time = "33333";           /* us */
+					embedded_metadata_height = "0";
+				};
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						isx021_out7: endpoint {
+							vc-id = <1>;
+							port-index = <6>;
+							bus-width = <BUS_WIDTH>;
+							remote-endpoint = <&tier4_csi_in7>;
+						};
+					};
+				};
+
+				gmsl-link { /* isx021_h@1c */
+					src-csi-port = "b";           /* Port at which sensor is connected to its serializer device. */
+					dst-csi-port = "a";           /* Destination CSI port on the Jetson side, connected at deserializer. */
+					serdes-csi-link = "b";        /* GMSL link sensor/serializer connected */
+					csi-mode = "1x4";             /*  to sensor CSI mode. */
+					st-vc = <0>;                  /* Sensor source default VC ID: 0 unless overridden by sensor. */
+					vc-id = <1>;                  /* Destination VC ID, assigned to sensor stream by deserializer. */
+					num-lanes = <NUM_LANES>;              /* Number of CSI lanes used. */
+					streams = "ued-u1", "yuv8";   /* Types of streams sensor is streaming. */
+				};
+
+			}; // End of isx021_h@1c
+		}; // End of i2c@1
+	}; // End of tca9543@73
+
+	t4_fpga: tier4_fpga@66 {
+		compatible = "nvidia,tier4_fpga";
+		reg = <0x66>;
+		generate-fsync = "false";
+		status = "okay";
+	};
+
+	}; // End of i2c@3180000
+};
+
+/ {
+
+	tcp: tegra-camera-platform {
+		compatible = "nvidia, tegra-camera-platform";
+		/**
+		* Physical settings to calculate max ISO BW
+		*
+		* num_csi_lanes = <>;
+		* Total number of CSI lanes when all cameras are active
+		*
+		* max_lane_speed = <>;
+		* Max lane speed in Kbit/s
+		*
+		* min_bits_per_pixel = <>;
+		* Min bits per pixel
+		*
+		* vi_peak_byte_per_pixel = <>;
+		* Max byte per pixel for the VI ISO case
+		*
+		* vi_bw_margin_pct = <>;
+		* Vi bandwidth margin in percentage
+		*
+		* max_pixel_rate = <>;
+		* Max pixel rate in Kpixel/s for the ISP ISO case
+		*
+		* isp_peak_byte_per_pixel = <>;
+		* Max byte per pixel for the ISP ISO case
+		*
+		* isp_bw_margin_pct = <>;
+		* Isp bandwidth margin in percentage
+		*/
+		num_csi_lanes = <8>;
+//#ifdef CAM_SERDES_GMSL)
+		max_lane_speed = <4000000>;
+//#else	// CAM_SERDES_FPDL
+//		max_lane_speed = <1500000>;	// FIX:?
+//#endif
+		min_bits_per_pixel = <10>;	// FIX:* 10
+		vi_peak_byte_per_pixel = <2>;
+		vi_bw_margin_pct = <25>;
+		//max_pixel_rate = <800000>;	// FIX:? 160|200|300|750
+		isp_peak_byte_per_pixel = <5>;
+		isp_bw_margin_pct = <25>;
+
+		/**
+		 * The general guideline for naming badge_info contains 3 parts, and is as follows,
+		 * The first part is the camera_board_id for the module; if the module is in a FFD
+		 * platform, then use the platform name for this part.
+		 * The second part contains the position of the module, ex. "rear" or "front".
+		 * The third part contains the last 6 characters of a part number which is found
+		 * in the module's specsheet from the vender.
+		 */
+		modules {
+			module0 {
+				badge = "isx021_rear";
+				position = "rear";
+				orientation = "1";
+				drivernode0 {
+					/* Declare PCL support driver (classically known as guid)  */
+					pcl_id = "v4l2_sensor";
+					/* Driver v4l2 device name */
+					devname = "isx021 30-001b";
+					/* Declare the device-tree hierarchy to driver instance */
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@0/isx021_a@1b";
+				};
+			};
+			module1 {
+				badge = "isx021_front";
+				position = "front";
+				orientation = "1";
+				drivernode0 {
+					/* Declare PCL support driver (classically known as guid)  */
+					pcl_id = "v4l2_sensor";
+					/* Driver v4l2 device name */
+					devname = "isx021 30-001c";
+					/* Declare the device-tree hierarchy to driver instance */
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@0/isx021_b@1c";
+				};
+			};
+			module2 {
+				badge = "isx021_topright";
+				position = "topright";
+				orientation = "1";
+				drivernode0 {
+					/* Declare PCL support driver (classically known as guid)  */
+					pcl_id = "v4l2_sensor";
+					/* Driver v4l2 device name */
+					devname = "isx021 31-001b";
+					/* Declare the device-tree hierarchy to driver instance */
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@1/isx021_c@1b";
+				};
+			};
+			module3 {
+				badge = "isx021_bottomright";
+				position = "bottomright";
+				orientation = "1";
+				drivernode0 {
+					/* Declare PCL support driver (classically known as guid)  */
+					pcl_id = "v4l2_sensor";
+					/* Driver v4l2 device name */
+					devname = "isx021 31-001c";
+					/* Declare the device-tree hierarchy to driver instance */
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@72/i2c@1/isx021_d@1c";
+				};
+			};
+			module4 {
+				badge = "isx021_topleft";
+				position = "topleft";
+				orientation = "1";
+				drivernode0 {
+					/* Declare PCL support driver (classically known as guid)  */
+					pcl_id = "v4l2_sensor";
+					/* Driver v4l2 device name */
+					devname = "isx021 32-001b";
+					/* Declare the device-tree hierarchy to driver instance */
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@0/isx021_e@1b";
+				};
+			};
+			module5 {
+				badge = "isx021_centerright";
+				position = "centerright";
+				orientation = "1";
+				drivernode0 {
+					/* Declare PCL support driver (classically known as guid)  */
+					pcl_id = "v4l2_sensor";
+					/* Driver v4l2 device name */
+					devname = "isx021 32-001c";
+					/* Declare the device-tree hierarchy to driver instance */
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@0/isx021_f@1c";
+				};
+			};
+			module6 {
+				badge = "isx021_cneterleft";
+				position = "centerleft";
+				orientation = "1";
+				drivernode0 {
+					/* Declare PCL support driver (classically known as guid)  */
+					pcl_id = "v4l2_sensor";
+					/* Driver v4l2 device name */
+					devname = "isx021 33-001b";
+					/* Declare the device-tree hierarchy to driver instance */
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@1/isx021_g@1b";
+				};
+			};
+			module7 {
+				badge = "isx021_bottomleft";
+				position = "bottomleft";
+				orientation = "1";
+				drivernode0 {
+					/* Declare PCL support driver (classically known as guid)  */
+					pcl_id = "v4l2_sensor";
+					/* Driver v4l2 device name */
+					devname = "isx021 33-001c";
+					/* Declare the device-tree hierarchy to driver instance */
+					proc-device-tree = "/proc/device-tree/i2c@3180000/tca9543@73/i2c@1/isx021_h@1c";
+				};
+			};
+		};
+	};
+};
