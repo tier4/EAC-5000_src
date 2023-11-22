@@ -41,6 +41,17 @@
 
 #define CAPTURE_TIMEOUT_MS	2500
 
+/*For Econ stream monitor wait Queue*/
+
+#define ECON_NUM_OF_ERR_CNT 5
+#define DEV_NAME_CHAR_SKIP 11
+#define DEV_NAME_CHAR 17
+wait_queue_head_t econ_err_hand_q;
+int econ_frame_err_track = 0;
+int econ_num_uncorr_err = 0;
+char econ_dev_name[32];
+static uint8_t check_queue_init = 0;
+
 static const struct vi_capture_setup default_setup = {
 	.channel_flags = 0
 	| CAPTURE_CHANNEL_FLAG_VIDEO
@@ -283,6 +294,12 @@ static int vi5_channel_setup_queue(struct tegra_channel *chan,
 	unsigned int *nbuffers)
 {
 	int ret = 0;
+	/* Initialize Econ wait queue */
+	if(check_queue_init == 0){
+		init_waitqueue_head(&econ_err_hand_q);
+		printk("Initialized E-con wait queue\n");
+		check_queue_init = 1;
+	}
 
 	*nbuffers = clamp(*nbuffers, CAPTURE_MIN_BUFFERS, CAPTURE_MAX_BUFFERS);
 
@@ -591,6 +608,20 @@ done:
 	goto rel_buf;
 
 uncorr_err:
+
+	/* Monitor and Set Streaming monitor flags for ECON cam */
+	printk("video device name=%s \n",chan->video->name);
+	memcpy(econ_dev_name,
+			chan->video->name + DEV_NAME_CHAR_SKIP, DEV_NAME_CHAR);
+
+	econ_num_uncorr_err++;
+	printk("Uncorr_ERR_Occured %d Times\n",econ_num_uncorr_err);
+	if(econ_num_uncorr_err > ECON_NUM_OF_ERR_CNT && econ_frame_err_track == 0){
+		econ_frame_err_track = 1;
+		printk("setting econ_frame_err_track\n ");
+		wake_up_interruptible(&econ_err_hand_q);
+	}
+
 	spin_lock_irqsave(&chan->capture_state_lock, flags);
 	chan->capture_state = CAPTURE_ERROR;
 	spin_unlock_irqrestore(&chan->capture_state_lock, flags);
@@ -600,6 +631,11 @@ uncorr_err:
 rel_buf:
 	vi5_release_buffer(chan, buf);
 }
+/* Export the symbols to use in Sensor driver */
+EXPORT_SYMBOL(econ_dev_name);
+EXPORT_SYMBOL(econ_err_hand_q);
+EXPORT_SYMBOL(econ_num_uncorr_err);
+EXPORT_SYMBOL(econ_frame_err_track);
 
 static int vi5_channel_error_recover(struct tegra_channel *chan,
 	bool queue_error)

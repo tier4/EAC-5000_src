@@ -24,7 +24,8 @@
 //#include "cvb/tegra234-p3737-0000-camera-imx390-a00_4otocam+2stereolabs.dtsi"
 //#include "cvb/tegra234-p3737-0000-camera-ar0234-a00-stereolabs.dtsi"
 //#include "cvb/tegra234-p3737-0000-camera-tier4.dtsi"
-#include "cvb/NileCAM25/tegra234-orin-agx-camera-ECON-NILECAM25.dtsi"
+//#include "cvb/NileCAM25/tegra234-orin-agx-camera-ECON-NILECAM25.dtsi"
+#include "cvb/NileCAM81/tegra234-orin-agx-camera-ECON-NILECAM81.dtsi"
 #include <t234-common-cvm/tegra234-cpuidle.dtsi>
 #include <t234-common-cvm/tegra234-thermal.dtsi>
 #include <t234-common-cvm/tegra234-thermal-cooling.dtsi>
