@@ -14,6 +14,13 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/* camera control gpio definitions */
+#define CAM0_PWDN	TEGRA234_MAIN_GPIO(H, 6)
+#define CAM1_PWDN	TEGRA234_MAIN_GPIO(AC, 0)
+#define CAM2_PWDN	TEGRA234_MAIN_GPIO(H, 3)
+#define CAM3_PWDN	TEGRA234_MAIN_GPIO(AC, 1)
+#define CAMERA_I2C_MUX_BUS(x) (0x1E + x)
+
 / {
 	/* all cameras are disabled by default */
 	capture_vi_base: tegra-capture-vi {
@@ -399,6 +406,60 @@
 					status = "disabled";
 					pcl_id = "v4l2_lens";
 				};
+			};
+		};
+	};
+
+	i2c@3180000 {
+		dsermux1: tca9543@72 {
+			compatible = "nxp,pca9543";
+			reg = <0x72>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			skip_mux_detect = "yes";
+			vif-supply = <&p3737_vdd_1v8_sys>;
+			vcc-supply = <&p3737_vdd_1v8_sys>;
+			vcc-pullup-supply = <&battery_reg>;
+			force_bus_start = <CAMERA_I2C_MUX_BUS(0)>;
+
+			i2c@0 {
+				reg = <0>;
+				i2c-mux,deselect-on-exit;
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+
+			i2c@1 {
+				reg = <1>;
+				i2c-mux,deselect-on-exit;
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+		};
+
+		dsermux2: tca9543@73 {
+			compatible = "nxp,pca9543";
+			reg = <0x73>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			skip_mux_detect = "yes";
+			vif-supply = <&p3737_vdd_1v8_sys>;
+			vcc-supply = <&p3737_vdd_1v8_sys>;
+			vcc-pullup-supply = <&battery_reg>;
+			force_bus_start = <CAMERA_I2C_MUX_BUS(2)>;
+
+			i2c@0 {
+				reg = <0>;
+				i2c-mux,deselect-on-exit;
+				address-cells = <1>;
+				#size-cells = <0>;
+			};
+
+			i2c@1 {
+				reg = <1>;
+				i2c-mux,deselect-on-exit;
+				#address-cells = <1>;
+				#size-cells = <0>;
 			};
 		};
 	};
